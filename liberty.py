@@ -89,7 +89,7 @@ def startLiberty(stop_event=None):
 	cfg = config.read_config()
 
 	utils.log("app started")
-	# wait_EOD(stop_event=stop_event)
+	wait_EOD(stop_event=stop_event)
 	if stop_event and stop_event.is_set():
 		utils.log("app stopped")
 		return
