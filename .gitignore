@@ -1,3 +1,5 @@
+# Python bytecode
+__pycache__/
 
 # Environment variables
 .env
