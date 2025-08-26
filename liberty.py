@@ -37,6 +37,41 @@ def getLibertyEOD(url):
 	# os.system('taskkill /IM chrome.exe /F')
 	return html
 
+def getLibertyChatEOD(url):
+	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url])
+	time.sleep(20 + random.uniform(1, 2))
+	
+	pyautogui.click(x=1365, y=900)
+	time.sleep(1)
+	pyautogui.press('end')
+	time.sleep(1)
+	pyautogui.moveTo(x=1365, y=900)
+    
+	pyautogui.dragTo(560, 900, button='left', duration=1)
+	time.sleep(1)
+    
+	for _ in range(70):
+		pyautogui.hotkey('shift', 'up')
+		time.sleep(random.uniform(0.1, 0.2))
+    
+	pyautogui.hotkey('ctrl', 'c')
+	time.sleep(1)
+    
+	pyautogui.click(x=1888, y=23) # Close Chrome
+	time.sleep(1)
+    
+	html = pyperclip.paste()
+    
+	clean_text = html.encode('ascii', 'ignore').decode('ascii')
+      
+	parts = clean_text.split('\r\nToday\r\n')
+      
+	if len(parts) < 2:
+		return ""
+
+	return parts[-1]
+	
+
 def parse_trade_signals(text):
 	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+\.\d+)\s+(LONG|SHORT)"
 	pattern = re.compile(regexPattern, re.IGNORECASE)
@@ -71,7 +106,7 @@ def unlockScreen():
 	time.sleep(10)
 
 def getcursor():
-	time.sleep(5)
+	time.sleep(3)
 	x, y = pyautogui.position()
 	print(f"Cursor position: ({x}, {y})")
 
@@ -99,7 +134,7 @@ def startLiberty(stop_event=None):
 	unlockScreen()
 	
 	url = cfg.get("url")
-	text = getLibertyEOD(url)
+	text = getLibertyChatEOD(url)
 	utils.log(text)
 	orders = parse_trade_signals(text)
 	utils.log(orders)
