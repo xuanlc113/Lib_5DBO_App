@@ -114,7 +114,7 @@ def wait_for_358_ny():
     ny_tz = pytz.timezone('America/New_York')
     while True:
         now_ny = datetime.datetime.now(ny_tz)
-        if now_ny.hour == 15 and now_ny.minute >= 58:
+        if now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 50:
             break
         time.sleep(1)
 
