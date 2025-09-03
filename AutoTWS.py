@@ -44,13 +44,10 @@ def start(orders):
         utils.log("Failed to connect to IB API, exiting...")
         return
 
-    tickerActionDict = {}
-
     for order in orders:
         ticker = order["ticker"]
         action = order["action"]
         triggerPrice = order["price"]
-        tickerActionDict[ticker] = action
         contract = app.createContract(ticker)
         reqId = app.nextRequestID()
         app.tickerReqIdDict[ticker] = reqId
@@ -61,34 +58,57 @@ def start(orders):
             continue
 
         bar = app.tickerData[reqId]
-        entryPrice = bar.close
-        if action == "LONG":
-            entryPrice = app.tickerAsk.get(reqId, bar.close)
-        elif action == "SHORT":
-            entryPrice = app.tickerBid.get(reqId, bar.close)
-        entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
-        quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, capital * risk)
-        if quantity <= 0:
-            utils.log(f"Invalid quantity for {ticker}, skipping order.")
-            continue
 
         orderId = app.nextRequestID()
         app.tickerOrderIdDict[ticker] = orderId
         if action == "LONG":
             if bar.close > triggerPrice:
+                utils.log(f"Current price {bar.close} > trigger price {triggerPrice} for LONG order on {ticker}, sending limit order")
+
+                entryPrice = app.tickerAsk.get(reqId, bar.close)
+                entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
+                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, capital * risk)
+                if quantity <= 0:
+                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
+                    continue
                 limitPrice = entryPrice + limitBuffer
                 app.sendLimitOrder(orderId, contract, "BUY", quantity, limitPrice)
                 utils.log(f"Placed LONG limit order for {ticker}: qty={quantity}, price={limitPrice}")
             else:
-                utils.log(f"Current price {bar.close} is below trigger price {triggerPrice} for LONG order on {ticker}, skipping.")
+                utils.log(f"Current price {bar.close} < trigger price {triggerPrice} for LONG order on {ticker}, sending stop limit order")
+
+                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, capital * risk)
+                if stopLimitQuantity <= 0:
+                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
+                    continue
+                stopPrice = triggerPrice + 0.01
+                limitPrice = triggerPrice + 0.01 + limitBuffer
+                app.sendStopLimitOrder(orderId, contract, "BUY", stopLimitQuantity, stopPrice, limitPrice)
+                utils.log(f"Placed LONG stop limit order for {ticker}: qty={stopLimitQuantity}, stopPrice={stopPrice}, limitPrice={limitPrice}")
         elif action == "SHORT":
             if bar.close < triggerPrice:
+                utils.log(f"Current price {bar.close} < trigger price {triggerPrice} for SHORT order on {ticker}, sending limit order")
+
+                entryPrice = app.tickerBid.get(reqId, bar.close)
+                entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
+                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, capital * risk)
+                if quantity <= 0:
+                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
+                    continue
                 limitPrice = entryPrice - limitBuffer
                 app.sendLimitOrder(orderId, contract, "SELL", quantity, limitPrice)
                 utils.log(f"Placed SHORT limit order for {ticker}: qty={quantity}, price={limitPrice}")
             else:
-                utils.log(f"Current price {bar.close} is above trigger price {triggerPrice} for SHORT order on {ticker}, skipping.")
-
+                utils.log(f"Current price {bar.close} > trigger price {triggerPrice} for SHORT order on {ticker}, sending stop limit order")
+                
+                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, capital * risk)
+                if stopLimitQuantity <= 0:
+                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
+                    continue
+                stopPrice = triggerPrice - 0.01
+                limitPrice = triggerPrice - 0.01 - limitBuffer
+                app.sendStopLimitOrder(orderId, contract, "SELL", stopLimitQuantity, stopPrice, limitPrice)
+                utils.log(f"Placed SHORT stop limit order for {ticker}: qty={stopLimitQuantity}, stopPrice={stopPrice}, limitPrice={limitPrice}")
 
     time.sleep(10)
     
@@ -99,6 +119,7 @@ def start(orders):
         for order in orders:
             ticker = order["ticker"]
             action = order["action"]
+            triggerPrice = order["price"]
             if ticker not in unfilledTickers:
                 continue
             orderId = app.tickerOrderIdDict.get(ticker)
@@ -152,19 +173,44 @@ def start(orders):
                 utils.log(f"Order for {ticker} filled.")
                 continue
 
-            # Use the same orderId to replace the existing order
             if action == "LONG":
                 if newBar.close > triggerPrice:
-                    newLimitPrice = entryPrice + limitBuffer
-                    app.sendLimitOrder(orderId, contract, "BUY", newQty, newLimitPrice)
-                    utils.log(f"Replaced LONG limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
+                    if app.orderIdTypeDict.get(orderId, "") == "STP LMT":
+                        app.cancelOrder(orderId)
+                        if not app.waitForCancelOrder(orderId, timeout=10):
+                            utils.log(f"failed to cancel stop limit order for {ticker}, skipping limit order.")
+                            continue
+
+                        orderId = app.nextRequestID()
+                        app.tickerOrderIdDict[ticker] = orderId
+
+                        newLimitPrice = entryPrice + limitBuffer
+                        app.sendLimitOrder(orderId, contract, "BUY", newQty, newLimitPrice)
+                        utils.log(f"Replaced LONG limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
+                    else:
+                        newLimitPrice = entryPrice + limitBuffer
+                        app.sendLimitOrder(orderId, contract, "BUY", newQty, newLimitPrice)
+                        utils.log(f"Replaced LONG limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
                 else:
                     utils.log(f"Current price {newBar.close} is below trigger price {triggerPrice} for LONG order on {ticker}, skipping.")
             elif action == "SHORT":
                 if newBar.close < triggerPrice:
-                    newLimitPrice = entryPrice - limitBuffer
-                    app.sendLimitOrder(orderId, contract, "SELL", newQty, newLimitPrice)
-                    utils.log(f"Replaced SHORT limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
+                    if app.orderIdTypeDict.get(orderId, "") == "STP LMT":
+                        app.cancelOrder(orderId)
+                        if not app.waitForCancelOrder(orderId, timeout=10):
+                            utils.log(f"failed to cancel stop limit order for {ticker}, skipping limit order.")
+                            continue
+
+                        orderId = app.nextRequestID()
+                        app.tickerOrderIdDict[ticker] = orderId
+                        
+                        newLimitPrice = entryPrice - limitBuffer
+                        app.sendLimitOrder(orderId, contract, "SELL", newQty, newLimitPrice)
+                        utils.log(f"Replaced SHORT limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
+                    else:
+                        newLimitPrice = entryPrice - limitBuffer
+                        app.sendLimitOrder(orderId, contract, "SELL", newQty, newLimitPrice)
+                        utils.log(f"Replaced SHORT limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
                 else:
                     utils.log(f"Current price {newBar.close} is above trigger price {triggerPrice} for SHORT order on {ticker}, skipping.")
 
@@ -180,7 +226,7 @@ def start(orders):
 #      {
 #           "ticker": "AAPL",
 #           "action": "LONG",
-#           "price": 150.00
+#           "price": 350.00
 #      },
 #      {
 #           "ticker": "GOOGL",

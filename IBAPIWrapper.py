@@ -42,5 +42,6 @@ class IBAPIWrapper(EWrapper):
         self.orderAvgFillPrice[orderId] = avgFillPrice
         if status == "Filled":
             self.orderRemainingDict[orderId] = 0
+            print(f"Order {orderId} filled: {filled} shares at avg price {avgFillPrice}.")
         elif filled > 0 and remaining > 0:
             print(f"Order {orderId} partially filled: {filled} filled, {remaining} remaining.")
