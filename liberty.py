@@ -66,6 +66,8 @@ def getLibertyChatEOD(url):
 	html = pyperclip.paste()
     
 	clean_text = html.encode('ascii', 'ignore').decode('ascii')
+
+	utils.log(clean_text)
       
 	parts = clean_text.split('\r\nToday\r\n')
       
