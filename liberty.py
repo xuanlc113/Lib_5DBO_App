@@ -49,8 +49,11 @@ def getLibertyChatEOD(url):
     
 	pyautogui.dragTo(560, 900, button='left', duration=1)
 	time.sleep(1)
+
+	pyautogui.moveTo(x=460, y=900)
+	time.sleep(1)
     
-	for _ in range(70):
+	for _ in range(100):
 		pyautogui.hotkey('shift', 'up')
 		time.sleep(random.uniform(0.1, 0.2))
     
