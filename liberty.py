@@ -106,22 +106,13 @@ def wait_EOD(stop_event=None):
             time.sleep(1)
 
 def unlockScreen():
-	pyautogui.click(x=1200, y=975)
+	pyautogui.click(x=1000, y=50)
 	time.sleep(10)
 
 def getcursor():
 	time.sleep(3)
 	x, y = pyautogui.position()
 	print(f"Cursor position: ({x}, {y})")
-
-def wait_for_358_ny():
-    ny_tz = pytz.timezone('America/New_York')
-    while True:
-        now_ny = datetime.datetime.now(ny_tz)
-        if now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 50:
-            break
-        time.sleep(1)
-
 
 def startLiberty(stop_event=None):
 	# print(getcursor())
@@ -153,7 +144,6 @@ def startLiberty(stop_event=None):
 	orders = orders[:5]
 
 	if len(orders) > 0:
-		wait_for_358_ny()
 		start(orders)
 
 	utils.log("app stopped")
