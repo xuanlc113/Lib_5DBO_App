@@ -38,32 +38,31 @@ def getLibertyEOD(url):
 	return html
 
 def getLibertyChatEOD(url):
-	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url])
-	time.sleep(20 + random.uniform(1, 2))
+	si = subprocess.STARTUPINFO()
+	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+	si.wShowWindow = 3   # MAXIMIZE WINDOW
+	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url], startupinfo=si)
+	time.sleep(30 + random.uniform(1, 2))
 	
 	pyautogui.click(x=1365, y=900)
-	time.sleep(1)
-	pyautogui.press('end')
-	time.sleep(1)
-	pyautogui.moveTo(x=1365, y=900)
-    
-	pyautogui.dragTo(560, 900, button='left', duration=1)
-	time.sleep(1)
+	time.sleep(2)
+	
+	pyautogui.press('home')
+	time.sleep(20)
+	pyautogui.scroll(500)
+	time.sleep(20)
 
-	pyautogui.moveTo(x=460, y=900)
-	time.sleep(1)
-    
-	for _ in range(100):
-		pyautogui.hotkey('shift', 'up')
-		time.sleep(random.uniform(0.1, 0.2))
-    
+	pyautogui.hotkey('ctrl', 'a')
+	time.sleep(2)
+
 	pyautogui.hotkey('ctrl', 'c')
-	time.sleep(1)
-    
-	pyautogui.click(x=1888, y=23) # Close Chrome
-	time.sleep(1)
+	time.sleep(2)
     
 	html = pyperclip.paste()
+	time.sleep(2)
+    
+	pyautogui.click(x=1888, y=23) # Close Chrome
+	time.sleep(2)
     
 	clean_text = html.encode('ascii', 'ignore').decode('ascii')
 
@@ -78,7 +77,7 @@ def getLibertyChatEOD(url):
 	
 
 def parse_trade_signals(text):
-	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+\.\d+)\s+(LONG|SHORT)"
+	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+(?:\.\d+)?)\s+(LONG|SHORT)"
 	pattern = re.compile(regexPattern, re.IGNORECASE)
 	results = []
 	for match in pattern.finditer(text):
@@ -100,7 +99,7 @@ def wait_EOD(stop_event=None):
         if stop_event and stop_event.is_set():
             return
         now_ny = datetime.datetime.now(ny_tz)
-        if now_ny.hour == 15 and now_ny.minute >= 55:
+        if now_ny.hour == 15 and now_ny.minute >= 54:
             utils.log(f"EOD: {now_ny.hour}:{now_ny.minute}")
             break
         else:
