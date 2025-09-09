@@ -4,38 +4,37 @@ import pyperclip
 import time
 import subprocess
 import random
-import sys
 import datetime
 import pytz
 from AutoTWS import start
 import utils
 import config
 
-def getLibertyEOD(url):
-	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url])
-	time.sleep(20 + random.uniform(1, 2))
+# def getLibertyEOD(url):
+# 	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url])
+# 	time.sleep(20 + random.uniform(1, 2))
 	
-	# pyautogui.hotkey('win', 'printscreen')
-	pyautogui.click(x=1216, y=970)
-	time.sleep(20 + random.uniform(1, 2))
+# 	# pyautogui.hotkey('win', 'printscreen')
+# 	pyautogui.click(x=1216, y=970)
+# 	time.sleep(20 + random.uniform(1, 2))
       
-	# for i in range(3):
-	# 	pyautogui.click(x=1216, y=970)
-	# 	time.sleep(2)
-	# 	pyautogui.hotkey('win', 'printscreen')
-	# 	time.sleep(1)
+# 	# for i in range(3):
+# 	# 	pyautogui.click(x=1216, y=970)
+# 	# 	time.sleep(2)
+# 	# 	pyautogui.hotkey('win', 'printscreen')
+# 	# 	time.sleep(1)
           
-	# time.sleep(5)
-	pyautogui.hotkey('ctrl', 'a')
-	time.sleep(1)
-	pyautogui.hotkey('ctrl', 'c')
-	time.sleep(1)
+# 	# time.sleep(5)
+# 	pyautogui.hotkey('ctrl', 'a')
+# 	time.sleep(1)
+# 	pyautogui.hotkey('ctrl', 'c')
+# 	time.sleep(1)
 
-	html = pyperclip.paste()
+# 	html = pyperclip.paste()
 	
-	pyautogui.click(x=1888, y=23)
-	# os.system('taskkill /IM chrome.exe /F')
-	return html
+# 	pyautogui.click(x=1888, y=23)
+# 	# os.system('taskkill /IM chrome.exe /F')
+# 	return html
 
 def getLibertyChatEOD(url):
 	si = subprocess.STARTUPINFO()
@@ -43,14 +42,20 @@ def getLibertyChatEOD(url):
 	si.wShowWindow = 3   # MAXIMIZE WINDOW
 	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url], startupinfo=si)
 	time.sleep(30 + random.uniform(1, 2))
+	pyautogui.hotkey('win', 'printscreen')
+	time.sleep(2)
 	
 	pyautogui.click(x=1365, y=900)
 	time.sleep(2)
 	
 	pyautogui.press('home')
 	time.sleep(20)
+	pyautogui.hotkey('win', 'printscreen')
+	time.sleep(2)
 	pyautogui.scroll(500)
 	time.sleep(20)
+	pyautogui.hotkey('win', 'printscreen')
+	time.sleep(2)
 
 	pyautogui.hotkey('ctrl', 'a')
 	time.sleep(2)
@@ -59,6 +64,8 @@ def getLibertyChatEOD(url):
 	time.sleep(2)
     
 	html = pyperclip.paste()
+	time.sleep(2)
+	pyautogui.hotkey('win', 'printscreen')
 	time.sleep(2)
     
 	pyautogui.click(x=1888, y=23) # Close Chrome
@@ -115,7 +122,6 @@ def getcursor():
 	print(f"Cursor position: ({x}, {y})")
 
 def startLiberty(stop_event=None):
-	# print(getcursor())
 	cfg = config.read_config()
 
 	utils.log("app started")
@@ -147,3 +153,5 @@ def startLiberty(stop_event=None):
 		start(orders)
 
 	utils.log("app stopped")
+
+# print(getcursor())

@@ -25,9 +25,10 @@ def isWithinRetryWindow():
     return dtime(15, 50) <= now_ny < dtime(16, 0)
 
 def wait_for_358_ny():
+    utils.log("Waiting for 15:58...")
     ny_tz = pytz.timezone('America/New_York')
     while True:
-        now_ny = datetime.datetime.now(ny_tz)
+        now_ny = datetime.now(ny_tz)
         if (now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 55) or (now_ny.hour == 15 and now_ny.minute >= 58):
             break
         time.sleep(1)
@@ -53,6 +54,7 @@ def start(orders):
         return
     
     wait_for_358_ny()
+    utils.log("placing orders...")
 
     for order in orders:
         ticker = order["ticker"]
@@ -245,4 +247,4 @@ def start(orders):
 #      },
 # ]
 
-# start(orders)
+# start([])
