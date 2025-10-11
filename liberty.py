@@ -10,32 +10,6 @@ from AutoTWS import start
 import utils
 import config
 
-# def getLibertyEOD(url):
-# 	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url])
-# 	time.sleep(20 + random.uniform(1, 2))
-	
-# 	# pyautogui.hotkey('win', 'printscreen')
-# 	pyautogui.click(x=1216, y=970)
-# 	time.sleep(20 + random.uniform(1, 2))
-      
-# 	# for i in range(3):
-# 	# 	pyautogui.click(x=1216, y=970)
-# 	# 	time.sleep(2)
-# 	# 	pyautogui.hotkey('win', 'printscreen')
-# 	# 	time.sleep(1)
-          
-# 	# time.sleep(5)
-# 	pyautogui.hotkey('ctrl', 'a')
-# 	time.sleep(1)
-# 	pyautogui.hotkey('ctrl', 'c')
-# 	time.sleep(1)
-
-# 	html = pyperclip.paste()
-	
-# 	pyautogui.click(x=1888, y=23)
-# 	# os.system('taskkill /IM chrome.exe /F')
-# 	return html
-
 def getLibertyChatEOD(url):
 	si = subprocess.STARTUPINFO()
 	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
@@ -86,18 +60,17 @@ def getLibertyChatEOD(url):
 def parse_trade_signals(text):
 	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+(?:\.\d+)?)\s+(LONG|SHORT)"
 	pattern = re.compile(regexPattern, re.IGNORECASE)
-	results = []
+	results_dict = {}
 	for match in pattern.finditer(text):
 		ticker = match.group(1).upper()
 		entry_price = float(match.group(2))
 		direction = match.group(3).upper()
-		# Adjust risk per share to current trading price
-		results.append({
+		results_dict[ticker] = {
 			"ticker": ticker,
 			"action": direction,
 			"price": entry_price,
-		})
-	return results
+		}
+	return list(results_dict.values())
 
 def wait_EOD(stop_event=None):
     utils.log("Waiting for 15:55...")
@@ -106,7 +79,7 @@ def wait_EOD(stop_event=None):
         if stop_event and stop_event.is_set():
             return
         now_ny = datetime.datetime.now(ny_tz)
-        if now_ny.hour == 15 and now_ny.minute >= 54:
+        if now_ny.hour == 15 and now_ny.minute >= 55:
             utils.log(f"EOD: {now_ny.hour}:{now_ny.minute}")
             break
         else:
@@ -132,6 +105,7 @@ def startLiberty(stop_event=None):
 	
 	utils.log("begin processing")
 
+	# total autogui time takes ~100s --> start at 15:55:00 to finish by 15:56:40
 	unlockScreen()
 	
 	url = cfg.get("url")
