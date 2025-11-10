@@ -45,3 +45,7 @@ def log(msg, filename=None):
         filename = os.path.join(log_dir, f"log-{date_str}.out")
     with open(filename, "a", encoding="utf-8") as f:
         f.write(log_line + "\n")
+
+def getNowDateString():
+    return datetime.now().strftime("%B %#d, %Y")
+    # return datetime.now().strftime("%B %-d, %Y")  # Unix/Linux/Mac

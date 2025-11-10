@@ -10,7 +10,7 @@ from AutoTWS import start
 import utils
 import config
 
-def getLibertyChatEOD(url):
+def getDiscordChatEOD(url):
 	si = subprocess.STARTUPINFO()
 	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	si.wShowWindow = 3   # MAXIMIZE WINDOW
@@ -19,43 +19,34 @@ def getLibertyChatEOD(url):
 	pyautogui.hotkey('win', 'printscreen')
 	time.sleep(2)
 	
-	pyautogui.click(x=1365, y=900)
+	pyautogui.click(x=1030, y=1030)
 	time.sleep(2)
 	
-	pyautogui.press('home')
+	pyautogui.hotkey('ctrl', 'pageup')
 	time.sleep(20)
 	pyautogui.hotkey('win', 'printscreen')
-	time.sleep(2)
-	pyautogui.scroll(500)
-	time.sleep(20)
-	pyautogui.hotkey('win', 'printscreen')
-	time.sleep(2)
+	time.sleep(5)
 
-	pyautogui.hotkey('ctrl', 'a')
-	time.sleep(2)
-
-	pyautogui.hotkey('ctrl', 'c')
-	time.sleep(2)
-    
+	pyautogui.hotkey('ctrl', 'shift', '3')
+	time.sleep(5)
+	
 	html = pyperclip.paste()
-	time.sleep(2)
-	pyautogui.hotkey('win', 'printscreen')
-	time.sleep(2)
-    
+	time.sleep(5)
+	
 	pyautogui.click(x=1888, y=23) # Close Chrome
 	time.sleep(2)
-    
+	
 	clean_text = html.encode('ascii', 'ignore').decode('ascii')
 
 	utils.log(clean_text)
-      
-	parts = clean_text.split('\r\nToday\r\n')
-      
+	
+	now_date_str = utils.getNowDateString()
+	parts = clean_text.split(f'\r\n{now_date_str}\r\n')
+	  
 	if len(parts) < 2:
 		return ""
 
 	return parts[-1]
-	
 
 def parse_trade_signals(text):
 	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+(?:\.\d+)?)\s+(LONG|SHORT)"
@@ -109,7 +100,7 @@ def startLiberty(stop_event=None):
 	unlockScreen()
 	
 	url = cfg.get("url")
-	text = getLibertyChatEOD(url)
+	text = getDiscordChatEOD(url)
 	utils.log(text)
 	orders = parse_trade_signals(text)
 	utils.log(orders)
@@ -121,11 +112,9 @@ def startLiberty(stop_event=None):
 	# 	orders = parse_trade_signals(llmOut)
 	# 	utils.log(orders)
 
-	orders = orders[:5]
+	orders = orders[:7]
 
 	if len(orders) > 0:
 		start(orders)
 
 	utils.log("app stopped")
-
-# print(getcursor())
