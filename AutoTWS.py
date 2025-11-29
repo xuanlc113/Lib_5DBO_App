@@ -23,12 +23,14 @@ def isWithinRetryWindow():
     ny_tz = pytz.timezone("America/New_York")
     now_ny = datetime.now(ny_tz).time()
     return dtime(15, 50) <= now_ny < dtime(16, 0)
+    # return dtime(12, 50) <= now_ny < dtime(13, 0)
 
 def wait_for_358_ny():
     utils.log("Waiting for 15:58...")
     ny_tz = pytz.timezone('America/New_York')
     while True:
         now_ny = datetime.now(ny_tz)
+        # if (now_ny.hour == 12 and now_ny.minute >= 57 and now_ny.second >= 55) or (now_ny.hour == 12 and now_ny.minute >= 58):
         if (now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 55) or (now_ny.hour == 15 and now_ny.minute >= 58):
             break
         time.sleep(1)

@@ -70,6 +70,7 @@ def wait_EOD(stop_event=None):
         if stop_event and stop_event.is_set():
             return
         now_ny = datetime.datetime.now(ny_tz)
+        # if now_ny.hour == 12 and now_ny.minute >= 55:
         if now_ny.hour == 15 and now_ny.minute >= 55:
             utils.log(f"EOD: {now_ny.hour}:{now_ny.minute}")
             break
