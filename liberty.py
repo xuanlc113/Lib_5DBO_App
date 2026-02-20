@@ -14,8 +14,10 @@ def getDiscordChatEOD(url):
 	si = subprocess.STARTUPINFO()
 	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	si.wShowWindow = 3   # MAXIMIZE WINDOW
-	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", url], startupinfo=si)
-	time.sleep(30 + random.uniform(1, 2))
+	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", "--new-window", url], startupinfo=si)
+	time.sleep(3)
+	pyautogui.hotkey('win', 'up')  # Maximize the new window, sometimes window opens halfscreen if another window is already open
+	time.sleep(27 + random.uniform(1, 2))
 	pyautogui.hotkey('win', 'printscreen')
 	time.sleep(2)
 	
@@ -113,9 +115,16 @@ def startLiberty(stop_event=None):
 	# 	orders = parse_trade_signals(llmOut)
 	# 	utils.log(orders)
 
-	orders = orders[:7]
+	orders = orders[:5]
 
 	if len(orders) > 0:
 		start(orders)
 
 	utils.log("app stopped")
+
+# cfg = config.read_config()
+# url = cfg.get("url")
+# text = getDiscordChatEOD(url)
+# print(text)
+# orders = parse_trade_signals(text)
+# print(orders)
