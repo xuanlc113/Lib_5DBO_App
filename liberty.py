@@ -15,7 +15,7 @@ def getDiscordChatEOD(url):
 	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	si.wShowWindow = 3   # MAXIMIZE WINDOW
 	subprocess.Popen([r"C:\Program Files\Google\Chrome\Application\chrome.exe", "--new-window", url], startupinfo=si)
-	time.sleep(27 + random.uniform(1, 2))
+	time.sleep(30 + random.uniform(1, 2))
 	pyautogui.hotkey('win', 'up')  # Maximize the new window, sometimes window opens halfscreen if another window is already open
 	time.sleep(2)
 	pyautogui.hotkey('win', 'printscreen')
