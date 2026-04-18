@@ -22,7 +22,7 @@ def getUnfilledTickers(app, orders):
 def isWithinRetryWindow():
     ny_tz = pytz.timezone("America/New_York")
     now_ny = datetime.now(ny_tz).time()
-    return dtime(15, 50) <= now_ny < dtime(16, 0)
+    return dtime(15, 50) <= now_ny < dtime(15, 59, 35)
     # return dtime(12, 50) <= now_ny < dtime(13, 0)
 
 def wait_for_358_ny():
@@ -230,6 +230,14 @@ def start(orders):
 
         time.sleep(10)
         unfilledTickers = getUnfilledTickers(app, orders)
+
+    utils.log("Cancelling remaining active orders...")
+    for ticker in unfilledTickers:
+        orderId = app.tickerOrderIdDict.get(ticker)
+        if orderId is not None:
+            utils.log(f"Cancelling order for {ticker} (orderId={orderId})")
+            app.cancelOrder(orderId)
+    utils.log(f"Unfilled tickers: {unfilledTickers}")
 
     time.sleep(5)
     app.disconnect()
