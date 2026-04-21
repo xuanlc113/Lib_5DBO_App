@@ -7,6 +7,7 @@ from ibapi.order_cancel import OrderCancel
 
 from IBAPIWrapper import IBAPIWrapper
 from IBAPIClient import IBAPIClient
+import utils
 
 class IBAPIApp(IBAPIWrapper, IBAPIClient):
     def __init__(self, ipAddress, portId, clientId):
@@ -45,7 +46,7 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
     def waitForData(self, ticker, action, timeout=5):
         reqId = self.tickerReqIdDict.get(ticker)
         if reqId is None:
-            print(f"No reqId found for ticker {ticker}.")
+            utils.log(f"No reqId found for ticker {ticker}.")
             return False
         start = time.time()
         while True:
@@ -59,7 +60,7 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
                 if ohlc_ready and bid_ready:
                     break
             if time.time() - start > timeout:
-                print(f"Timeout waiting for OHLC data for {ticker}.")
+                utils.log(f"Timeout waiting for OHLC data for {ticker}.")
                 self.cancelMktData(reqId)
                 return False
             time.sleep(0.1)
@@ -72,10 +73,10 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
         while True:
             status = self.orderStatusDict.get(orderId, "")
             if status == "Cancelled":
-                print(f"Order {orderId} has been cancelled.")
+                utils.log(f"Order {orderId} has been cancelled.")
                 return True
             if time.time() - start > timeout:
-                print(f"Timeout waiting for cancellation of order {orderId}.")
+                utils.log(f"Timeout waiting for cancellation of order {orderId}.")
                 return False
             time.sleep(0.1)
     
