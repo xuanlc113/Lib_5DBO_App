@@ -105,6 +105,9 @@ def startLiberty(stop_event=None):
 	url = cfg.get("url")
 	text = getDiscordChatEOD(url)
 	utils.log(text)
+	if text == "":
+		utils.log("No text retrieved from Discord, exiting...")
+		utils.alarm()
 	orders = parse_trade_signals(text)
 	utils.log(orders)
 
