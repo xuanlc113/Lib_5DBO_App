@@ -1,6 +1,9 @@
 from datetime import datetime
 import os
 from ibapi.wrapper import BarData
+import winsound
+import pythoncom
+from pycaw.pycaw import AudioUtilities
 
 log_callback = None
 
@@ -49,3 +52,10 @@ def log(msg, filename=None):
 def getNowDateString():
     return datetime.now().strftime("%B %#d, %Y")
     # return datetime.now().strftime("%B %-d, %Y")  # Unix/Linux/Mac
+
+def alarm():
+    pythoncom.CoInitialize()
+    device = AudioUtilities.GetSpeakers()
+    volume = device.EndpointVolume
+    volume.SetMasterVolumeLevel(-8.0, None)
+    winsound.PlaySound("alarm.wav", winsound.SND_LOOP | winsound.SND_ASYNC)

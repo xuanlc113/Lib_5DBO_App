@@ -35,6 +35,30 @@ def wait_for_358_ny():
             break
         time.sleep(1)
 
+def launchTWSAPI(host, port, clientId):
+    utils.log("Launching IB API application...")
+    app = IBAPIApp(host, port, clientId)
+    time.sleep(5)
+    if app.nextOrderId == 0:
+        utils.log("Failed to connect to IB API, exiting...")
+        return None
+    
+    utils.log("IB API Application Launched.")
+    
+    # dummy call for historical data connection
+    utils.log("Making dummy call for historical data connection...")
+    reqId = app.nextRequestID()
+    contract = app.createContract("AAPL")
+    app.reqData(reqId, contract)
+
+    if not app.waitForData('AAPL', 'LONG', timeout=10):
+        utils.log(f"No OHLC data for dummy AAPL call")
+        return None
+    else:
+        utils.log("IB API historical data connection successful.")
+        return app
+    
+
 def start(orders):
     cfg = config.read_config()
     host = cfg["host"]
@@ -48,11 +72,13 @@ def start(orders):
         utils.log("Not within entry window, exiting...")
         return
     
-    utils.log("Launching IB API application...")
-    app = IBAPIApp(host, port, clientId)
-    time.sleep(5)
-    if app.nextOrderId == 0:
-        utils.log("Failed to connect to IB API, exiting...")
+    app = launchTWSAPI(host, port, clientId)
+    if not app:
+        app = launchTWSAPI(host, port, clientId)
+
+    if not app:
+        utils.log("Failed to launch IB API application after retry, exiting...")
+        utils.alarm()
         return
     
     wait_for_358_ny()
@@ -69,6 +95,7 @@ def start(orders):
 
         if not app.waitForData(ticker, action, timeout=10):
             utils.log(f"No OHLC data for {ticker}, skipping order.")
+            utils.alarm()
             continue
 
         bar = app.tickerData[reqId]
@@ -241,7 +268,7 @@ def start(orders):
 
     time.sleep(5)
     app.disconnect()
-    utils.log("IB API Application stopped")
+    utils.log("IB API Application stopped\n")
 
 
 # orders = [
@@ -257,4 +284,4 @@ def start(orders):
 #      },
 # ]
 
-# start([])
+# start()

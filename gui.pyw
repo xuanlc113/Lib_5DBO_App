@@ -1,5 +1,6 @@
 import tkinter as tk
 import threading
+import winsound
 from liberty import startLiberty
 import config
 import utils
@@ -22,6 +23,7 @@ def on_button_click():
     liberty_thread.start()
 
 def on_stop_button_click():
+    winsound.PlaySound(None, winsound.SND_PURGE)
     stop_liberty_flag.set()
 
 def open_settings():

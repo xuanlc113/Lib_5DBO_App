@@ -28,11 +28,12 @@ class IBAPIWrapper(EWrapper):
         self.tickerRetrieved[reqId] = True
 
     def tickPrice(self, reqId: TickerId, tickType: TickType, price: float, attrib: TickAttrib):
-        utils.log(f"Received tick price for reqId {reqId}: {tickType}, {price}, {attrib}")
         if tickType == 1:  # BID
+            utils.log(f"Received tick price for reqId {reqId}: {tickType}, {price}, {attrib}")
             self.tickerBid[reqId] = price
             self.tickerBidRetrieved[reqId] = True
         elif tickType == 2:  # ASK
+            utils.log(f"Received tick price for reqId {reqId}: {tickType}, {price}, {attrib}")
             self.tickerAsk[reqId] = price
             self.tickerAskRetrieved[reqId] = True
 
