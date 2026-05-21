@@ -61,6 +61,7 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
                     break
             if time.time() - start > timeout:
                 utils.log(f"Timeout waiting for OHLC data for {ticker}.")
+                self.cancelHistoricalData(reqId)
                 self.cancelMktData(reqId)
                 return False
             time.sleep(0.1)
