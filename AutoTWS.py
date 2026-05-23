@@ -74,6 +74,7 @@ def start(orders):
     
     app = launchTWSAPI(host, port, clientId)
     if not app:
+        time.sleep(3)
         app = launchTWSAPI(host, port, clientId)
 
     if not app:
