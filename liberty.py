@@ -66,14 +66,15 @@ def parse_trade_signals(text):
 	return list(results_dict.values())
 
 def wait_EOD(stop_event=None):
-    utils.log("Waiting for 15:55...")
+    half_day = config.read_config()["half_day"]
+    target_hour = 12 if half_day else 15
+    utils.log(f"Waiting for {target_hour}:55...")
     ny_tz = pytz.timezone('America/New_York')
     while True:
         if stop_event and stop_event.is_set():
             return
         now_ny = datetime.datetime.now(ny_tz)
-        # if now_ny.hour == 12 and now_ny.minute >= 55:
-        if now_ny.hour == 15 and now_ny.minute >= 55:
+        if now_ny.hour == target_hour and now_ny.minute >= 55:
             utils.log(f"EOD: {now_ny.hour}:{now_ny.minute}")
             break
         else:

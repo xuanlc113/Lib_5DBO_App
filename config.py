@@ -16,6 +16,7 @@ def read_config():
         "risk": float(cfg.get("risk", "0.01")),
         "bet_multiplier": float(cfg.get("bet_multiplier", "1.0")),
         "limit_buffer": float(cfg.get("limit_buffer", "0.02")),
+        "half_day": cfg.get("half_day", "false").lower() == "true",
         "url": cfg.get("url", ""),
     }
 

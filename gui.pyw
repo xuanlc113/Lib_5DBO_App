@@ -43,6 +43,7 @@ def save_settings():
         "risk": risk_entry.get(),
         "bet_multiplier": bet_multiplier_entry.get(),
         "limit_buffer": limit_buffer_entry.get(),
+        "half_day": half_day_var.get(),
         "url": url_entry.get(),
     }
     updated = config.save_settings(new_settings)
@@ -70,6 +71,7 @@ def load_settings():
     bet_multiplier_entry.insert(0, str(cfg.get('bet_multiplier', '')))
     limit_buffer_entry.delete(0, tk.END)
     limit_buffer_entry.insert(0, str(cfg.get('limit_buffer', '')))
+    half_day_var.set("true" if cfg.get('half_day', False) else "false")
     url_entry.delete(0, tk.END)
     url_entry.insert(0, cfg.get('url', ''))
 
@@ -144,11 +146,19 @@ add_setting_row(settings_frame, "Limit Buffer:", limit_buffer_entry, 7)
 url_entry = tk.Entry(settings_frame)
 add_setting_row(settings_frame, "URL:", url_entry, 8)
 
+half_day_var = tk.StringVar(value="false")
+half_day_label = tk.Label(settings_frame, text="Session:", bg="#f0f0f0", width=12, anchor='w')
+half_day_label.grid(row=9, column=0, sticky='w', padx=(5, 5), pady=2)
+radio_frame = tk.Frame(settings_frame, bg="#f0f0f0")
+radio_frame.grid(row=9, column=1, sticky='w', padx=(0, 5), pady=2)
+tk.Radiobutton(radio_frame, text="Full", variable=half_day_var, value="false", bg="#f0f0f0").pack(side=tk.LEFT)
+tk.Radiobutton(radio_frame, text="Half", variable=half_day_var, value="true", bg="#f0f0f0").pack(side=tk.LEFT)
+
 save_btn = tk.Button(settings_frame, text="Save", command=save_settings)
 close_btn = tk.Button(settings_frame, text="Close", command=close_settings)
 
-save_btn.grid(row=9, column=0, padx=5, pady=10, sticky='e')
-close_btn.grid(row=9, column=1, padx=5, pady=10, sticky='w')
+save_btn.grid(row=10, column=0, padx=5, pady=10, sticky='e')
+close_btn.grid(row=10, column=1, padx=5, pady=10, sticky='w')
 
 
 # Hide settings frame at start

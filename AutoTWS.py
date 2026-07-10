@@ -20,18 +20,21 @@ def getUnfilledTickers(app, orders):
     return unfilled
 
 def isWithinRetryWindow():
+    half_day = config.read_config()["half_day"]
     ny_tz = pytz.timezone("America/New_York")
     now_ny = datetime.now(ny_tz).time()
+    if half_day:
+        return dtime(12, 50) <= now_ny < dtime(12, 59, 35)
     return dtime(15, 50) <= now_ny < dtime(15, 59, 35)
-    # return dtime(12, 50) <= now_ny < dtime(13, 0)
 
 def wait_for_358_ny():
-    utils.log("Waiting for 15:58...")
+    half_day = config.read_config()["half_day"]
+    target_hour = 12 if half_day else 15
+    utils.log(f"Waiting for {target_hour}:58...")
     ny_tz = pytz.timezone('America/New_York')
     while True:
         now_ny = datetime.now(ny_tz)
-        # if (now_ny.hour == 12 and now_ny.minute >= 57 and now_ny.second >= 45) or (now_ny.hour == 12 and now_ny.minute >= 58):
-        if (now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 45) or (now_ny.hour == 15 and now_ny.minute >= 58):
+        if (now_ny.hour == target_hour and now_ny.minute >= 57 and now_ny.second >= 45) or (now_ny.hour == target_hour and now_ny.minute >= 57 and now_ny.second >= 45):
             break
         time.sleep(1)
 
@@ -70,9 +73,9 @@ def start(orders):
     limitBuffer = float(cfg["limit_buffer"])
     betMultiplier = float(cfg.get("bet_multiplier", 1.0))
 
-    # if not isWithinRetryWindow():
-    #     utils.log("Not within entry window, exiting...")
-    #     return
+    if not isWithinRetryWindow():
+        utils.log("Not within entry window, exiting...")
+        return
     
     app = launchTWSAPI(host, port, clientId)
     if not app:
@@ -90,13 +93,12 @@ def start(orders):
     acctReqId = app.reqAccountCapital()
     accountCapital = app.waitForAccountCapital(acctReqId)
     if accountCapital is not None:
-        utils.log(f"Account capital (NetLiquidation): ${accountCapital:.2f}, max cap: ${maxCapital:.2f}")
+        utils.log(f"Account capital (NetLiquidation): ${accountCapital:.2f}, max capital allowed: ${maxCapital:.2f}")
         config.save_settings({"fallback_capital": round(accountCapital, 2)})
         capital = min(accountCapital, maxCapital)
         utils.log(f"Using capital: ${capital:.2f}")
     else:
         utils.log(f"Could not retrieve account capital, using fallback capital: ${fallbackCapital:.2f}")
-        utils.alarm()
     
     betSize = capital * risk * betMultiplier
     utils.log(f"Using bet size: ${betSize:.2f}")
