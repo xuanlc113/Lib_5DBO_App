@@ -11,8 +11,10 @@ def read_config():
         "host": cfg.get("host", ""),
         "port": int(cfg.get("port", "7496")),
         "client_id": int(cfg.get("client_id", "10")),
-        "capital": float(cfg.get("capital", "50000")),
+        "max_capital": float(cfg.get("max_capital", "50000")),
+        "fallback_capital": float(cfg.get("fallback_capital", "50000")),
         "risk": float(cfg.get("risk", "0.01")),
+        "bet_multiplier": float(cfg.get("bet_multiplier", "1.0")),
         "limit_buffer": float(cfg.get("limit_buffer", "0.02")),
         "url": cfg.get("url", ""),
     }

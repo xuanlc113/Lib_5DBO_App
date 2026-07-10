@@ -38,8 +38,10 @@ def save_settings():
         "host": host_entry.get(),
         "port": port_entry.get(),
         "client_id": client_id_entry.get(),
-        "capital": capital_entry.get(),
+        "max_capital": max_capital_entry.get(),
+        "fallback_capital": fallback_capital_entry.get(),
         "risk": risk_entry.get(),
+        "bet_multiplier": bet_multiplier_entry.get(),
         "limit_buffer": limit_buffer_entry.get(),
         "url": url_entry.get(),
     }
@@ -58,10 +60,14 @@ def load_settings():
     port_entry.insert(0, str(cfg.get('port', '')))
     client_id_entry.delete(0, tk.END)
     client_id_entry.insert(0, str(cfg.get('client_id', '')))
-    capital_entry.delete(0, tk.END)
-    capital_entry.insert(0, str(cfg.get('capital', '')))
+    max_capital_entry.delete(0, tk.END)
+    max_capital_entry.insert(0, str(cfg.get('max_capital', '')))
+    fallback_capital_entry.delete(0, tk.END)
+    fallback_capital_entry.insert(0, str(cfg.get('fallback_capital', '')))
     risk_entry.delete(0, tk.END)
     risk_entry.insert(0, str(cfg.get('risk', '')))
+    bet_multiplier_entry.delete(0, tk.END)
+    bet_multiplier_entry.insert(0, str(cfg.get('bet_multiplier', '')))
     limit_buffer_entry.delete(0, tk.END)
     limit_buffer_entry.insert(0, str(cfg.get('limit_buffer', '')))
     url_entry.delete(0, tk.END)
@@ -120,23 +126,29 @@ add_setting_row(settings_frame, "Port:", port_entry, 1)
 client_id_entry = tk.Entry(settings_frame)
 add_setting_row(settings_frame, "Client ID:", client_id_entry, 2)
 
-capital_entry = tk.Entry(settings_frame)
-add_setting_row(settings_frame, "Capital:", capital_entry, 3)
+max_capital_entry = tk.Entry(settings_frame)
+add_setting_row(settings_frame, "Max Capital:", max_capital_entry, 3)
+
+fallback_capital_entry = tk.Entry(settings_frame)
+add_setting_row(settings_frame, "Fallback Capital:", fallback_capital_entry, 4)
 
 risk_entry = tk.Entry(settings_frame)
-add_setting_row(settings_frame, "Risk:", risk_entry, 4)
+add_setting_row(settings_frame, "Risk:", risk_entry, 5)
+
+bet_multiplier_entry = tk.Entry(settings_frame)
+add_setting_row(settings_frame, "Bet Mult:", bet_multiplier_entry, 6)
 
 limit_buffer_entry = tk.Entry(settings_frame)
-add_setting_row(settings_frame, "Limit Buffer:", limit_buffer_entry, 5)
+add_setting_row(settings_frame, "Limit Buffer:", limit_buffer_entry, 7)
 
 url_entry = tk.Entry(settings_frame)
-add_setting_row(settings_frame, "URL:", url_entry, 6)
+add_setting_row(settings_frame, "URL:", url_entry, 8)
 
 save_btn = tk.Button(settings_frame, text="Save", command=save_settings)
 close_btn = tk.Button(settings_frame, text="Close", command=close_settings)
 
-save_btn.grid(row=7, column=0, padx=5, pady=10, sticky='e')
-close_btn.grid(row=7, column=1, padx=5, pady=10, sticky='w')
+save_btn.grid(row=9, column=0, padx=5, pady=10, sticky='e')
+close_btn.grid(row=9, column=1, padx=5, pady=10, sticky='w')
 
 
 # Hide settings frame at start

@@ -110,3 +110,24 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
     def cancelOrder(self, orderID):
         orderCancel = OrderCancel()
         super().cancelOrder(orderID, orderCancel)
+
+    def reqAccountCapital(self):
+        reqId = self.nextRequestID()
+        super().reqAccountSummary(reqId, "All", "$LEDGER:ALL")
+        return reqId
+
+    def waitForAccountCapital(self, reqId, timeout=10):
+        start = time.time()
+        while True:
+            if self.accountSummaryReqDone.get(reqId, False):
+                super().cancelAccountSummary(reqId)
+                net_liq_base = self.accountSummaryDict.get("NetLiquidationBase")
+                exchange_rate_usd = self.accountSummaryDict.get("ExchangeRateUSD")
+                if net_liq_base is not None and exchange_rate_usd and exchange_rate_usd != 0:
+                    return net_liq_base / exchange_rate_usd
+                return None
+            if time.time() - start > timeout:
+                utils.log("Timeout waiting for account summary.")
+                super().cancelAccountSummary(reqId)
+                return None
+            time.sleep(0.1)

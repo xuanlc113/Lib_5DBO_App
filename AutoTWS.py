@@ -30,8 +30,8 @@ def wait_for_358_ny():
     ny_tz = pytz.timezone('America/New_York')
     while True:
         now_ny = datetime.now(ny_tz)
-        # if (now_ny.hour == 12 and now_ny.minute >= 57 and now_ny.second >= 55) or (now_ny.hour == 12 and now_ny.minute >= 58):
-        if (now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 55) or (now_ny.hour == 15 and now_ny.minute >= 58):
+        # if (now_ny.hour == 12 and now_ny.minute >= 57 and now_ny.second >= 45) or (now_ny.hour == 12 and now_ny.minute >= 58):
+        if (now_ny.hour == 15 and now_ny.minute >= 57 and now_ny.second >= 45) or (now_ny.hour == 15 and now_ny.minute >= 58):
             break
         time.sleep(1)
 
@@ -64,13 +64,15 @@ def start(orders):
     host = cfg["host"]
     port = int(cfg["port"])
     clientId = int(cfg["client_id"])
-    capital = float(cfg["capital"])
+    maxCapital = float(cfg["max_capital"])
+    fallbackCapital = float(cfg["fallback_capital"])
     risk = float(cfg["risk"])
     limitBuffer = float(cfg["limit_buffer"])
+    betMultiplier = float(cfg.get("bet_multiplier", 1.0))
 
-    if not isWithinRetryWindow():
-        utils.log("Not within entry window, exiting...")
-        return
+    # if not isWithinRetryWindow():
+    #     utils.log("Not within entry window, exiting...")
+    #     return
     
     app = launchTWSAPI(host, port, clientId)
     if not app:
@@ -82,6 +84,23 @@ def start(orders):
         utils.alarm()
         return
     
+    
+    capital = fallbackCapital
+    # Retrieve live account capital and apply config capital as a cap
+    acctReqId = app.reqAccountCapital()
+    accountCapital = app.waitForAccountCapital(acctReqId)
+    if accountCapital is not None:
+        utils.log(f"Account capital (NetLiquidation): ${accountCapital:.2f}, max cap: ${maxCapital:.2f}")
+        config.save_settings({"fallback_capital": round(accountCapital, 2)})
+        capital = min(accountCapital, maxCapital)
+        utils.log(f"Using capital: ${capital:.2f}")
+    else:
+        utils.log(f"Could not retrieve account capital, using fallback capital: ${fallbackCapital:.2f}")
+        utils.alarm()
+    
+    betSize = capital * risk * betMultiplier
+    utils.log(f"Using bet size: ${betSize:.2f}")
+
     wait_for_358_ny()
     utils.log("placing orders...")
 
@@ -109,7 +128,7 @@ def start(orders):
 
                 entryPrice = app.tickerAsk.get(reqId, bar.close)
                 entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
-                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, capital * risk)
+                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, betSize)
                 if quantity <= 0:
                     utils.log(f"Invalid quantity for {ticker}, skipping order.")
                     continue
@@ -119,7 +138,7 @@ def start(orders):
             else:
                 utils.log(f"Current price {bar.close:.3f} < trigger price {triggerPrice} for LONG order on {ticker}, sending stop limit order")
 
-                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, capital * risk)
+                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, betSize)
                 if stopLimitQuantity <= 0:
                     utils.log(f"Invalid quantity for {ticker}, skipping order.")
                     continue
@@ -133,7 +152,7 @@ def start(orders):
 
                 entryPrice = app.tickerBid.get(reqId, bar.close)
                 entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
-                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, capital * risk)
+                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, betSize)
                 if quantity <= 0:
                     utils.log(f"Invalid quantity for {ticker}, skipping order.")
                     continue
@@ -143,7 +162,7 @@ def start(orders):
             else:
                 utils.log(f"Current price {bar.close:.3f} > trigger price {triggerPrice} for SHORT order on {ticker}, sending stop limit order")
                 
-                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, capital * risk)
+                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, betSize)
                 if stopLimitQuantity <= 0:
                     utils.log(f"Invalid quantity for {ticker}, skipping order.")
                     continue
@@ -192,7 +211,7 @@ def start(orders):
             dollarRisk = abs(avgFillPrice - stopValue) * filledQty
 
             # Calculate remaining bet size
-            totalBetSize = capital * risk
+            totalBetSize = capital * risk * betMultiplier
             remainingBetSize = totalBetSize - dollarRisk
             if remainingBetSize <= 0:
                 utils.log(f"No remaining risk for {ticker}, skipping replace.")

@@ -14,6 +14,8 @@ class IBAPIWrapper(EWrapper):
         self.orderFilledDict = {}
         self.orderRemainingDict = {}
         self.orderAvgFillPrice = {}
+        self.accountSummaryDict = {}
+        self.accountSummaryReqDone = {}
 
     def nextValidId(self, orderId):
         self.nextOrderId = orderId
@@ -46,6 +48,19 @@ class IBAPIWrapper(EWrapper):
             utils.log(f"Order {orderId} filled: {filled} shares at avg price {avgFillPrice}.")
         elif filled > 0 and remaining > 0:
             utils.log(f"Order {orderId} partially filled: {filled} filled, {remaining} remaining.")
+
+    def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
+        # utils.log(f"tag: {tag}, value: {value}, currency: {currency}")
+        try:
+            if tag == "NetLiquidationByCurrency" and currency == "BASE":
+                self.accountSummaryDict["NetLiquidationBase"] = float(value)
+            elif tag == "ExchangeRate" and currency == "USD":
+                self.accountSummaryDict["ExchangeRateUSD"] = float(value)
+        except ValueError:
+            pass
+
+    def accountSummaryEnd(self, reqId: int):
+        self.accountSummaryReqDone[reqId] = True
 
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson = ""):
         try:
