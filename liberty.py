@@ -9,6 +9,7 @@ import pytz
 from AutoTWS import start
 import utils
 import config
+import traceback
 
 def getDiscordChatEOD(url):
 	si = subprocess.STARTUPINFO()
@@ -100,29 +101,34 @@ def startLiberty(stop_event=None):
 	
 	utils.log("begin processing")
 
-	# total autogui time takes ~100s --> start at 15:55:00 to finish by 15:56:40
-	unlockScreen()
-	
-	url = cfg.get("url")
-	text = getDiscordChatEOD(url)
-	utils.log(text)
-	if text == "":
-		utils.log("No text retrieved from Discord, exiting...")
+	try:
+		# total autogui time takes ~100s --> start at 15:55:00 to finish by 15:56:40
+		unlockScreen()
+		
+		url = cfg.get("url")
+		text = getDiscordChatEOD(url)
+		utils.log(text)
+		if text == "":
+			utils.log("No text retrieved from Discord, exiting...")
+			utils.alarm()
+		orders = parse_trade_signals(text)
+		utils.log(orders)
+
+		# if len(orders) == 0:
+		# 	utils.log("using llm parser...")
+		# 	llmOut = llm.query_llm(text) // some empty string gives a huge list of tickers; dangerous
+		# 	print(llmOut)
+		# 	orders = parse_trade_signals(llmOut)
+		# 	utils.log(orders)
+
+		orders = orders[:5]
+
+		if len(orders) > 0:
+			start(orders)
+	except Exception as e:
+		utils.log(f"ERROR: {e}")
+		utils.log(traceback.format_exc())
 		utils.alarm()
-	orders = parse_trade_signals(text)
-	utils.log(orders)
-
-	# if len(orders) == 0:
-	# 	utils.log("using llm parser...")
-	# 	llmOut = llm.query_llm(text) // some empty string gives a huge list of tickers; dangerous
-	# 	print(llmOut)
-	# 	orders = parse_trade_signals(llmOut)
-	# 	utils.log(orders)
-
-	orders = orders[:5]
-
-	if len(orders) > 0:
-		start(orders)
 
 	utils.log("app stopped")
 
