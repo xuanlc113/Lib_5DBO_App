@@ -25,7 +25,7 @@ def getDiscordChatEOD(url):
 	pyautogui.click(x=1030, y=1030)
 	time.sleep(2)
 	
-	pyautogui.hotkey('ctrl', 'pageup')
+	pyautogui.hotkey('shift', 'pageup')
 	time.sleep(20)
 	pyautogui.hotkey('win', 'printscreen')
 	time.sleep(5)
@@ -136,5 +136,6 @@ def startLiberty(stop_event=None):
 # url = cfg.get("url")
 # text = getDiscordChatEOD(url)
 # print(text)
+# text= "1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT"
 # orders = parse_trade_signals(text)
 # print(orders)
