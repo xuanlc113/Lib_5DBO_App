@@ -1,66 +1,179 @@
+from __future__ import annotations
+
 import time
-from datetime import datetime, time as dtime
-import pytz
 
 from IBAPIApp import IBAPIApp
+from domain import BOSignal, PBSignal, OrderType, SignalType
 import utils
+import order_utils
 import config
 
-def getUnfilledTickers(app, orders):
-    unfilled = set()
-    for order in orders:
-        ticker = order["ticker"]
-        orderId = app.tickerOrderIdDict.get(ticker)
-        if orderId is None:
-            unfilled.add(ticker)
-            continue
-        status = app.getOrderStatus(orderId)
-        if status != "Filled":
-            unfilled.add(ticker)
-    return unfilled
-
-def isWithinRetryWindow():
-    half_day = config.read_config()["half_day"]
-    ny_tz = pytz.timezone("America/New_York")
-    now_ny = datetime.now(ny_tz).time()
-    if half_day:
-        return dtime(12, 50) <= now_ny < dtime(12, 59, 35)
-    return dtime(15, 50) <= now_ny < dtime(15, 59, 35)
-
-def wait_for_358_ny():
-    half_day = config.read_config()["half_day"]
-    target_hour = 12 if half_day else 15
-    utils.log(f"Waiting for {target_hour}:58...")
-    ny_tz = pytz.timezone('America/New_York')
-    while True:
-        now_ny = datetime.now(ny_tz)
-        if (now_ny.hour == target_hour and now_ny.minute >= 57 and now_ny.second >= 45):
-            break
-        time.sleep(1)
 
 def launchTWSAPI(host, port, clientId):
-    utils.log("Launching IB API application...")
-    app = IBAPIApp(host, port, clientId)
-    time.sleep(5)
-    if app.nextOrderId == 0:
-        utils.log("Failed to connect to IB API, exiting...")
-        return None
-    
-    utils.log("IB API Application Launched.")
-    
-    # dummy call for historical data connection
-    utils.log("Making dummy call for historical data connection...")
-    reqId = app.nextRequestID()
-    contract = app.createContract("AAPL")
-    app.reqData(reqId, contract)
+    for attempt in range(3):
+        utils.log("Launching IB API application...")
+        app = IBAPIApp(host, port, clientId)
+        time.sleep(5)
+        if not app.isConnected():
+            utils.log("Failed to connect to IB API, exiting...")
+        else:
+            utils.log("IB API Application Launched.")
+            utils.log("Making dummy call for historical data connection...")
+            bars = app.fetchHistoricalBars("AAPL", 1, "D", timeout=10)
+            bar = bars[-1] if bars else None
+            price = app.fetchMarketPrice("AAPL", "LONG", timeout=10) if bar is not None else None
+            if bar is None or price is None:
+                utils.log("No OHLC data for dummy AAPL call")
+            else:
+                utils.log("IB API historical data connection successful.")
+                return app
 
-    if not app.waitForData('AAPL', 'LONG', timeout=10):
-        utils.log(f"No OHLC data for dummy AAPL call")
-        return None
+        if attempt < 2:
+            utils.log(f"Retrying... (attempt {attempt + 2}/3)")
+            time.sleep(3)
+
+    return None
+
+
+def getCapital(app, fallbackCapital, maxCapital):
+    accountCapital = app.fetchAccountCapital()
+    if accountCapital is not None:
+        utils.log(f"Account capital (NetLiquidation): ${accountCapital:.2f}, max capital allowed: ${maxCapital:.2f}")
+        config.save_settings({"fallback_capital": round(accountCapital, 2)})
+        capital = min(accountCapital, maxCapital)
+        utils.log(f"Using capital: ${capital:.2f}")
+        return capital
+    utils.log(f"Could not retrieve account capital, using fallback capital: ${fallbackCapital:.2f}")
+    return fallbackCapital
+
+
+def handleSignalDetails(app, orders) -> list[BOSignal | PBSignal] | None:
+    signals = []
+    for order in orders:
+        ticker = order["ticker"]
+        signal_type_str = order["type"]
+
+        bars = app.fetchHistoricalBars(ticker, 1, "D", timeout=10)
+        bar = bars[-1] if bars else None
+        if bar is None:
+            utils.log(f"No historical bar for {ticker}, aborting.")
+            return None
+
+        if signal_type_str == "BO":
+            action = order["action"]
+            stop = bar.low if action == "LONG" else bar.high
+            signals.append(BOSignal(
+                ticker=ticker,
+                bar=bar,
+                action=action,
+                price=order["price"],
+                stop=stop,
+            ))
+        elif signal_type_str in ("PB_daily", "PB_weekly"):
+            signal_type = SignalType.PB_DAILY if signal_type_str == "PB_daily" else SignalType.PB_WEEKLY
+            interval = "D" if signal_type == SignalType.PB_DAILY else "W"
+            atr = app.fetchATR(ticker, period=20, interval=interval)
+            if atr is None:
+                utils.log(f"No ATR for {ticker}, aborting.")
+                return None
+            signals.append(PBSignal(
+                ticker=ticker,
+                bar=bar,
+                atr=atr,
+                signal_type=signal_type,
+            ))
+
+    return signals
+
+
+def getRetrySignals(app, signals: list[BOSignal | PBSignal]) -> list[BOSignal | PBSignal]:
+    unfilledTickers = []
+    for signal in signals:
+        order_info = app.getOrderInfo(signal.ticker)
+        if order_info is None:
+            unfilledTickers.append(signal)
+            continue
+        if order_info.order_type == OrderType.STP_LMT:
+            continue
+        if order_info.status != "Filled":
+            unfilledTickers.append(signal)
+    return unfilledTickers
+
+
+def handleBOSignal(app, signal: BOSignal, betSize, limitBuffer):
+    ticker = signal.ticker
+    action = signal.action
+    trigger_price = signal.price
+
+    order_info = app.getOrderInfo(ticker)
+    bet_size = betSize
+
+    if order_info is not None:
+        if order_info.status == "Filled":
+            return
+        risk_per_share = abs(order_info.avg_fill_price - signal.stop)
+        cumulative_risk = app.accumulateFilledRisk(ticker, risk_per_share)
+        bet_size = betSize - cumulative_risk
+        if bet_size <= 0:
+            utils.log(f"No remaining risk for {ticker}, skipping.")
+            return
+
+    market_price = app.fetchMarketPrice(ticker, action, timeout=10)
+    if market_price is None:
+        utils.log(f"No bid/ask for {ticker}, skipping order.")
+        return
+
+    is_past = order_utils.is_past_trigger(action, signal.bar.close, trigger_price)
+    if order_info is not None and not is_past:
+        utils.log(f"Current price {signal.bar.close} not past trigger {trigger_price} for {action} on {ticker}, skipping.")
+        return
+
+    ref_price = order_utils.getAcceptableEntry(signal.bar.close, market_price, action) if is_past else trigger_price
+    risk = order_utils.calc_bo_risk(action, signal.bar, ref_price, limitBuffer)
+    quantity = order_utils.calcQuantity(bet_size, risk)
+    if quantity <= 0:
+        utils.log(f"Invalid quantity for {ticker}, skipping order.")
+        return
+    limit_price = order_utils.calc_limit_price(action, ref_price, limitBuffer)
+    if is_past:
+        app.sendLimitOrder(ticker, action, quantity, limit_price, OrderType.LMT)
+        action_word = "Replaced" if order_info is not None else "Placed"
+        utils.log(f"{action_word} {action} limit order for {ticker}: qty={quantity}, price={limit_price}")
     else:
-        utils.log("IB API historical data connection successful.")
-        return app
-    
+        app.sendStopLimitOrder(ticker, action, quantity, ref_price, limit_price, OrderType.STP_LMT)
+        utils.log(f"Placed {action} stop limit order for {ticker}: qty={quantity}, stopPrice={ref_price}, limitPrice={limit_price}")
+
+
+def handlePBSignal(app, signal: PBSignal, betSize, limitBuffer):
+    ticker = signal.ticker
+
+    order_info = app.getOrderInfo(ticker)
+    bet_size = betSize
+
+    if order_info is not None:
+        if order_info.status == "Filled":
+            return
+        cumulative_risk = app.accumulateFilledRisk(ticker, signal.atr)
+        bet_size = betSize - cumulative_risk
+        if bet_size <= 0:
+            utils.log(f"No remaining risk for {ticker}, skipping replace.")
+            return
+
+    market_price = app.fetchMarketPrice(ticker, "LONG", timeout=10)
+    if market_price is None:
+        utils.log(f"No bid/ask for {ticker}, skipping order.")
+        return
+
+    quantity = order_utils.calcQuantity(bet_size, signal.atr)
+    if quantity <= 0:
+        utils.log(f"Invalid quantity for {ticker}, skipping order.")
+        return
+    entry_price = order_utils.getAcceptableEntry(signal.bar.close, market_price, "LONG")
+    limit_price = order_utils.calc_limit_price("LONG", entry_price, limitBuffer)
+    app.sendLimitOrder(ticker, "LONG", quantity, limit_price, OrderType.LMT)
+    action_word = "Replaced" if order_info is not None else "Placed"
+    utils.log(f"{action_word} PB limit order for {ticker}: qty={quantity}, price={limit_price}, atr={signal.atr:.4f}")
+
 
 def start(orders):
     cfg = config.read_config()
@@ -73,237 +186,62 @@ def start(orders):
     limitBuffer = float(cfg["limit_buffer"])
     betMultiplier = float(cfg.get("bet_multiplier", 1.0))
 
-    if not isWithinRetryWindow():
+    if not utils.isWithinRetryWindow(): # last 10 minutes
         utils.log("Not within entry window, exiting...")
-        return
-    
-    app = launchTWSAPI(host, port, clientId)
-    if not app:
-        time.sleep(3)
-        app = launchTWSAPI(host, port, clientId)
-
-    if not app:
-        utils.log("Failed to launch IB API application after retry, exiting...")
         utils.alarm()
         return
-    
-    
-    capital = fallbackCapital
-    # Retrieve live account capital and apply config capital as a cap
-    acctReqId = app.reqAccountCapital()
-    accountCapital = app.waitForAccountCapital(acctReqId)
-    if accountCapital is not None:
-        utils.log(f"Account capital (NetLiquidation): ${accountCapital:.2f}, max capital allowed: ${maxCapital:.2f}")
-        config.save_settings({"fallback_capital": round(accountCapital, 2)})
-        capital = min(accountCapital, maxCapital)
-        utils.log(f"Using capital: ${capital:.2f}")
-    else:
-        utils.log(f"Could not retrieve account capital, using fallback capital: ${fallbackCapital:.2f}")
-    
+
+    app = launchTWSAPI(host, port, clientId)
+    if not app:
+        utils.log("Failed to launch IB API application after 3 attempts, exiting...")
+        utils.alarm()
+        return
+
+    capital = getCapital(app, fallbackCapital, maxCapital)
     betSize = capital * risk * betMultiplier
     utils.log(f"Using bet size: ${betSize:.2f}")
 
-    wait_for_358_ny()
+    signals = handleSignalDetails(app, orders)
+    if signals is None:
+        utils.log("Failed to fetch signal details, exiting...")
+        utils.alarm()
+        return
+
+    utils.wait_until_ny(57, second=45)
     utils.log("placing orders...")
 
-    for order in orders:
-        ticker = order["ticker"]
-        action = order["action"]
-        triggerPrice = order["price"]
-        contract = app.createContract(ticker)
-        reqId = app.nextRequestID()
-        app.tickerReqIdDict[ticker] = reqId
-        app.reqData(reqId, contract)
-
-        if not app.waitForData(ticker, action, timeout=10):
-            utils.log(f"No OHLC data for {ticker}, skipping order.")
-            utils.alarm()
-            continue
-
-        bar = app.tickerData[reqId]
-
-        orderId = app.nextRequestID()
-        app.tickerOrderIdDict[ticker] = orderId
-        if action == "LONG":
-            if bar.close >= triggerPrice:
-                utils.log(f"Current price {bar.close:.3f} > trigger price {triggerPrice} for LONG order on {ticker}, sending limit order")
-
-                entryPrice = app.tickerAsk.get(reqId, bar.close)
-                entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
-                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, betSize)
-                if quantity <= 0:
-                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
-                    continue
-                limitPrice = entryPrice + limitBuffer
-                app.sendLimitOrder(orderId, contract, "BUY", quantity, limitPrice)
-                utils.log(f"Placed LONG limit order for {ticker}: qty={quantity}, price={limitPrice}")
-            else:
-                utils.log(f"Current price {bar.close:.3f} < trigger price {triggerPrice} for LONG order on {ticker}, sending stop limit order")
-
-                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, betSize)
-                if stopLimitQuantity <= 0:
-                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
-                    continue
-                stopPrice = triggerPrice
-                limitPrice = triggerPrice + limitBuffer
-                app.sendStopLimitOrder(orderId, contract, "BUY", stopLimitQuantity, stopPrice, limitPrice)
-                utils.log(f"Placed LONG stop limit order for {ticker}: qty={stopLimitQuantity}, stopPrice={stopPrice}, limitPrice={limitPrice}")
-        elif action == "SHORT":
-            if bar.close <= triggerPrice:
-                utils.log(f"Current price {bar.close:.3f} < trigger price {triggerPrice} for SHORT order on {ticker}, sending limit order")
-
-                entryPrice = app.tickerBid.get(reqId, bar.close)
-                entryPrice = utils.getAcceptableEntry(bar.close, entryPrice)
-                quantity = utils.calcQuantity(action, bar, entryPrice, limitBuffer, betSize)
-                if quantity <= 0:
-                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
-                    continue
-                limitPrice = entryPrice - limitBuffer
-                app.sendLimitOrder(orderId, contract, "SELL", quantity, limitPrice)
-                utils.log(f"Placed SHORT limit order for {ticker}: qty={quantity}, price={limitPrice}")
-            else:
-                utils.log(f"Current price {bar.close:.3f} > trigger price {triggerPrice} for SHORT order on {ticker}, sending stop limit order")
-                
-                stopLimitQuantity = utils.calcQuantity(action, bar, triggerPrice, limitBuffer, betSize)
-                if stopLimitQuantity <= 0:
-                    utils.log(f"Invalid quantity for {ticker}, skipping order.")
-                    continue
-                stopPrice = triggerPrice
-                limitPrice = triggerPrice - limitBuffer
-                app.sendStopLimitOrder(orderId, contract, "SELL", stopLimitQuantity, stopPrice, limitPrice)
-                utils.log(f"Placed SHORT stop limit order for {ticker}: qty={stopLimitQuantity}, stopPrice={stopPrice}, limitPrice={limitPrice}")
+    for signal in signals:
+        if isinstance(signal, BOSignal):
+            handleBOSignal(app, signal, betSize, limitBuffer)
+        elif isinstance(signal, PBSignal):
+            handlePBSignal(app, signal, betSize, limitBuffer)
 
     time.sleep(10)
-    
-    # Use the helper function to get unfilled tickers
-    unfilledTickers = getUnfilledTickers(app, orders)
-    utils.log(f"Unfilled tickers: {unfilledTickers}")
-    while unfilledTickers and isWithinRetryWindow():
-        for order in orders:
-            ticker = order["ticker"]
-            action = order["action"]
-            triggerPrice = order["price"]
-            if ticker not in unfilledTickers:
-                continue
-            orderId = app.tickerOrderIdDict.get(ticker)
-            if orderId is None:
-                continue
 
-            contract = app.createContract(ticker)
-            utils.log(f"Order for {ticker} not filled, requesting new data and replacing order...")
+    retrySignals = getRetrySignals(app, signals)
+    utils.log(f"Unfilled tickers: {[s.ticker for s in retrySignals]}")
 
-            # Request new bar data
-            newReqId = app.nextRequestID()
-            app.tickerReqIdDict[ticker] = newReqId
-            app.reqData(newReqId, contract)
-
-            if not app.waitForData(ticker, action, timeout=10):
-                utils.log(f"No new OHLC data or Bid/Ask for {ticker}, skipping replace.")
-                continue
-
-            newBar = app.tickerData[newReqId]
-
-            # Calculate filled quantity and capital used so far
-            filledQty = app.orderFilledDict.get(orderId, 0)
-            avgFillPrice = app.orderAvgFillPrice.get(orderId, 0)
-            stopValue = newBar.low
-            if action == "SHORT":
-                stopValue = newBar.high
-            
-            dollarRisk = abs(avgFillPrice - stopValue) * filledQty
-
-            # Calculate remaining bet size
-            totalBetSize = capital * risk * betMultiplier
-            remainingBetSize = totalBetSize - dollarRisk
-            if remainingBetSize <= 0:
-                utils.log(f"No remaining risk for {ticker}, skipping replace.")
-                continue
-
-
-            entryPrice = newBar.close
-            if action == "LONG":
-                entryPrice = app.tickerAsk.get(newReqId, newBar.close)
-            elif action == "SHORT":
-                entryPrice = app.tickerBid.get(newReqId, newBar.close)
-            entryPrice = utils.getAcceptableEntry(newBar.close, entryPrice)
-            newQty = utils.calcQuantity(action, newBar, entryPrice, limitBuffer, remainingBetSize)
-            if newQty <= 0:
-                utils.log(f"No remaining quantity {newQty} for {ticker}, skipping replace.")
-                continue
-
-            status = app.getOrderStatus(orderId)
-            if status == "Filled":
-                utils.log(f"Order for {ticker} filled.")
-                continue
-
-            if action == "LONG":
-                if newBar.close > triggerPrice:
-                    if app.orderIdTypeDict.get(orderId, "") == "STP LMT":
-                        app.cancelOrder(orderId)
-                        if not app.waitForCancelOrder(orderId, timeout=10):
-                            utils.log(f"failed to cancel stop limit order for {ticker}, skipping limit order.")
-                            continue
-
-                        orderId = app.nextRequestID()
-                        app.tickerOrderIdDict[ticker] = orderId
-
-                        newLimitPrice = entryPrice + limitBuffer
-                        app.sendLimitOrder(orderId, contract, "BUY", newQty, newLimitPrice)
-                        utils.log(f"Replaced LONG limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
-                    else:
-                        newLimitPrice = entryPrice + limitBuffer
-                        app.sendLimitOrder(orderId, contract, "BUY", newQty, newLimitPrice)
-                        utils.log(f"Replaced LONG limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
-                else:
-                    utils.log(f"Current price {newBar.close} is below trigger price {triggerPrice} for LONG order on {ticker}, skipping.")
-            elif action == "SHORT":
-                if newBar.close < triggerPrice:
-                    if app.orderIdTypeDict.get(orderId, "") == "STP LMT":
-                        app.cancelOrder(orderId)
-                        if not app.waitForCancelOrder(orderId, timeout=10):
-                            utils.log(f"failed to cancel stop limit order for {ticker}, skipping limit order.")
-                            continue
-
-                        orderId = app.nextRequestID()
-                        app.tickerOrderIdDict[ticker] = orderId
-                        
-                        newLimitPrice = entryPrice - limitBuffer
-                        app.sendLimitOrder(orderId, contract, "SELL", newQty, newLimitPrice)
-                        utils.log(f"Replaced SHORT limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
-                    else:
-                        newLimitPrice = entryPrice - limitBuffer
-                        app.sendLimitOrder(orderId, contract, "SELL", newQty, newLimitPrice)
-                        utils.log(f"Replaced SHORT limit order for {ticker}: qty={newQty}, price={newLimitPrice}")
-                else:
-                    utils.log(f"Current price {newBar.close} is above trigger price {triggerPrice} for SHORT order on {ticker}, skipping.")
-
+    while retrySignals and utils.isWithinRetryWindow():
+        for signal in retrySignals:
+            order_info = app.getOrderInfo(signal.ticker)
+            if order_info is not None:
+                if not app.cancelOrderForTicker(signal.ticker):
+                    continue
+            if isinstance(signal, BOSignal):
+                handleBOSignal(app, signal, betSize, limitBuffer)
+            elif isinstance(signal, PBSignal):
+                handlePBSignal(app, signal, betSize, limitBuffer)
         time.sleep(10)
-        unfilledTickers = getUnfilledTickers(app, orders)
+        retrySignals = getRetrySignals(app, signals)
 
     utils.log("Cancelling remaining active orders...")
-    for ticker in unfilledTickers:
-        orderId = app.tickerOrderIdDict.get(ticker)
-        if orderId is not None:
-            utils.log(f"Cancelling order for {ticker} (orderId={orderId})")
-            app.cancelOrder(orderId)
-    utils.log(f"Unfilled tickers: {unfilledTickers}")
+    for signal in retrySignals:
+        order_info = app.getOrderInfo(signal.ticker)
+        if order_info is not None:
+            utils.log(f"Cancelling order for {signal.ticker}")
+            app.cancelOrderForTicker(signal.ticker)
+    utils.log(f"Unfilled tickers: {[s.ticker for s in retrySignals]}")
 
     time.sleep(5)
     app.disconnect()
     utils.log("IB API Application stopped\n")
-
-
-# orders = [
-#      {
-#           "ticker": "AAPL",
-#           "action": "LONG",
-#           "price": 350.00
-#      },
-#      {
-#           "ticker": "GOOGL",
-#           "action": "SHORT",
-#           "price": 150.00
-#      },
-# ]
-
-# start([])

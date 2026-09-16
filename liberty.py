@@ -4,8 +4,6 @@ import pyperclip
 import time
 import subprocess
 import random
-import datetime
-import pytz
 from AutoTWS import start
 import utils
 import config
@@ -51,35 +49,64 @@ def getDiscordChatEOD(url):
 
 	return parts[-1]
 
-def parse_trade_signals(text):
-	regexPattern = r"\d+\)\s*\$([A-Z]+)[^$]*\$(\d+(?:\.\d+)?)\s+(LONG|SHORT)"
-	pattern = re.compile(regexPattern, re.IGNORECASE)
-	results_dict = {}
-	for match in pattern.finditer(text):
-		ticker = match.group(1).upper()
-		entry_price = float(match.group(2))
-		direction = match.group(3).upper()
-		results_dict[ticker] = {
-			"ticker": ticker,
-			"action": direction,
-			"price": entry_price,
-		}
-	return list(results_dict.values())
+def _extract_section(text, header_pattern):
+	match = re.search(header_pattern, text, re.IGNORECASE)
+	if not match:
+		return ""
+	start = match.end()
+	next_match = re.search(r'ls\s+v3\s+breakout|ls\s+pullbacks', text[start:], re.IGNORECASE)
+	end = start + next_match.start() if next_match else len(text)
+	return text[start:end]
 
-def wait_EOD(stop_event=None):
-    half_day = config.read_config()["half_day"]
-    target_hour = 12 if half_day else 15
-    utils.log(f"Waiting for {target_hour}:55...")
-    ny_tz = pytz.timezone('America/New_York')
-    while True:
-        if stop_event and stop_event.is_set():
-            return
-        now_ny = datetime.datetime.now(ny_tz)
-        if now_ny.hour == target_hour and now_ny.minute >= 55:
-            utils.log(f"EOD: {now_ny.hour}:{now_ny.minute}")
-            break
-        else:
-            time.sleep(1)
+def _parse_bo_signals(text):
+	if not text:
+		return []
+	ticker_re = re.compile(r'\$([A-Z]+)', re.IGNORECASE)
+	price_re = re.compile(r'\$(\d+(?:\.\d+)?)')
+	direction_re = re.compile(r'\b(LONG|SHORT)\b', re.IGNORECASE)
+	ticker_matches = list(ticker_re.finditer(text))
+	results = {}
+	for i, tm in enumerate(ticker_matches):
+		ticker = tm.group(1).upper()
+		chunk_end = ticker_matches[i + 1].start() if i + 1 < len(ticker_matches) else len(text)
+		chunk = text[tm.end():chunk_end]
+		price_match = price_re.search(chunk)
+		direction_match = direction_re.search(chunk)
+		if price_match and direction_match:
+			results[ticker] = {
+				"ticker": ticker,
+				"type": "BO",
+				"action": direction_match.group(1).upper(),
+				"price": float(price_match.group(1)),
+			}
+	return list(results.values())
+
+def _parse_pb_signals(text):
+	if not text:
+		return []
+	ticker_re = re.compile(r'\$([A-Z]+)', re.IGNORECASE)
+	results = {}
+	for line in text.splitlines():
+		tm = ticker_re.search(line)
+		if not tm:
+			continue
+		ticker = tm.group(1).upper()
+		if re.search(r'\bweekly\b', line, re.IGNORECASE):
+			results[ticker] = {"ticker": ticker, "type": "PB_weekly"}
+		elif re.search(r'\bdaily\b', line, re.IGNORECASE):
+			results[ticker] = {"ticker": ticker, "type": "PB_daily"}
+	return list(results.values())
+
+def parse_trade_signals(text):
+	bo_text = _extract_section(text, r'ls\s+v3\s+breakout')
+	pb_text = _extract_section(text, r'ls\s+pullbacks')
+	return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
+
+def order_and_cap_signals(signals):
+	pb_weekly = [s for s in signals if s["type"] == "PB_weekly"][:2]
+	bo = [s for s in signals if s["type"] == "BO"][:5]
+	pb_daily = [s for s in signals if s["type"] == "PB_daily"][:2]
+	return pb_weekly + bo + pb_daily
 
 def unlockScreen():
 	pyautogui.click(x=1000, y=50)
@@ -94,7 +121,7 @@ def startLiberty(stop_event=None):
 	cfg = config.read_config()
 
 	utils.log("app started")
-	wait_EOD(stop_event=stop_event)
+	utils.wait_until_ny(55, stop_event=stop_event)
 	if stop_event and stop_event.is_set():
 		utils.log("app stopped")
 		return
@@ -121,7 +148,7 @@ def startLiberty(stop_event=None):
 		# 	orders = parse_trade_signals(llmOut)
 		# 	utils.log(orders)
 
-		orders = orders[:5]
+		orders = order_and_cap_signals(orders)
 
 		if len(orders) > 0:
 			start(orders)
