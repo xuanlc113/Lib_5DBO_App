@@ -163,6 +163,15 @@ def startLiberty(stop_event=None):
 # url = cfg.get("url")
 # text = getDiscordChatEOD(url)
 # print(text)
-# text= "1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT"
+# text= """
+# ls v3 breakoUts
+# 1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT
+
+# ls pullbacks
+
+# $SD - Daily
+# $DEE - Weekly
+# """
 # orders = parse_trade_signals(text)
 # print(orders)
+

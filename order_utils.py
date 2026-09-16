@@ -38,9 +38,9 @@ def is_past_trigger(action: str, close: float, trigger_price: float) -> bool:
 
 
 
-def calc_atr(bars: list[Bar], period: int = 20) -> float:
-    bars = bars[-period:]
-    true_ranges = [bars[0].high - bars[0].low]
+def calc_atr(bars: list[Bar], period: int = 5) -> float:
+    bars = bars[-(period + 1):]
+    true_ranges = []
     for i in range(1, len(bars)):
         prev_close = bars[i - 1].close
         tr = max(
@@ -49,4 +49,6 @@ def calc_atr(bars: list[Bar], period: int = 20) -> float:
             abs(bars[i].low - prev_close),
         )
         true_ranges.append(tr)
+
+    print(true_ranges)
     return sum(true_ranges) / len(true_ranges)

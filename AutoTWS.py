@@ -14,8 +14,9 @@ def launchTWSAPI(host, port, clientId):
         utils.log("Launching IB API application...")
         app = IBAPIApp(host, port, clientId)
         time.sleep(5)
-        if not app.isConnected():
+        if not app.isReady():
             utils.log("Failed to connect to IB API, exiting...")
+            app.disconnect()
         else:
             utils.log("IB API Application Launched.")
             utils.log("Making dummy call for historical data connection...")
@@ -30,6 +31,7 @@ def launchTWSAPI(host, port, clientId):
 
         if attempt < 2:
             utils.log(f"Retrying... (attempt {attempt + 2}/3)")
+            app.disconnect()
             time.sleep(3)
 
     return None
@@ -72,7 +74,7 @@ def handleSignalDetails(app, orders) -> list[BOSignal | PBSignal] | None:
         elif signal_type_str in ("PB_daily", "PB_weekly"):
             signal_type = SignalType.PB_DAILY if signal_type_str == "PB_daily" else SignalType.PB_WEEKLY
             interval = "D" if signal_type == SignalType.PB_DAILY else "W"
-            atr = app.fetchATR(ticker, period=20, interval=interval)
+            atr = app.fetchATR(ticker, period=5, interval=interval)
             if atr is None:
                 utils.log(f"No ATR for {ticker}, aborting.")
                 return None
@@ -207,6 +209,8 @@ def start(orders):
         utils.alarm()
         return
 
+    utils.log(signals)
+
     utils.wait_until_ny(57, second=45)
     utils.log("placing orders...")
 
@@ -235,13 +239,35 @@ def start(orders):
         retrySignals = getRetrySignals(app, signals)
 
     utils.log("Cancelling remaining active orders...")
-    for signal in retrySignals:
+    unfilledTickers = []
+    for signal in signals:
         order_info = app.getOrderInfo(signal.ticker)
-        if order_info is not None:
+        if order_info is not None and order_info.status != "Filled":
             utils.log(f"Cancelling order for {signal.ticker}")
             app.cancelOrderForTicker(signal.ticker)
-    utils.log(f"Unfilled tickers: {[s.ticker for s in retrySignals]}")
+            unfilledTickers.append(signal.ticker)
+    utils.log(f"Unfilled tickers: {unfilledTickers}")
 
     time.sleep(5)
     app.disconnect()
     utils.log("IB API Application stopped\n")
+
+
+# start([
+#     {
+# 		"ticker": "BXMT",
+#         "type": "BO",
+#         "action": "SHORT",
+#         "price": 10.00,
+#     },
+#     {
+#         "ticker": "IWM",
+#         "type": "BO",
+#         "action": "LONG",
+#         "price": 270,
+#     },
+#     # {"ticker": "QQQ", "type": "PB_weekly"},
+#     {"ticker": "SPY", "type": "PB_daily"}
+# ])
+
+# start([])

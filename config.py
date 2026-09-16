@@ -1,14 +1,14 @@
 import configparser
 import os
 
-CONFIG_FILE = "config.ini"
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
 
 def read_config():
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
     cfg = config['DEFAULT'] if 'DEFAULT' in config else {}
     return {
-        "host": cfg.get("host", ""),
+        "host": cfg.get("host", "127.0.0.1"),
         "port": int(cfg.get("port", "7496")),
         "client_id": int(cfg.get("client_id", "10")),
         "max_capital": float(cfg.get("max_capital", "50000")),

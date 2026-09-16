@@ -43,7 +43,7 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
         thread.start()
         setattr(self, "_thread", thread)
 
-    def isConnected(self) -> bool:
+    def isReady(self) -> bool:
         return self.nextOrderId != 0
 
     def _nextRequestID(self) -> int:
@@ -86,6 +86,8 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
             time.sleep(0.1)
 
     def fetchMarketPrice(self, ticker: str, action: str, timeout: int = 10) -> Optional[float]:
+        self.tickerAsk.pop(ticker, None)
+        self.tickerBid.pop(ticker, None)
         reqId = self._nextRequestID()
         contract = self._createContract(ticker)
         self._reqIdToTicker[reqId] = ticker
@@ -181,8 +183,8 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
         self._tickerOrderStateDict[ticker] = _TickerOrderState(order_id=new_id, order_type=order_type)
         self._placeStopLimitOrder(new_id, contract, side, quantity, stop_price, limit_price)
 
-    def fetchATR(self, ticker: str, period: int = 20, interval: str = "D") -> Optional[float]:
-        bars = self.fetchHistoricalBars(ticker, period, interval)
+    def fetchATR(self, ticker: str, period: int = 5, interval: str = "D") -> Optional[float]:
+        bars = self.fetchHistoricalBars(ticker, period + 1, interval) # fetch 1 addition bar for atr gap
         if not bars:
             return None
         return order_utils.calc_atr(bars, period)
