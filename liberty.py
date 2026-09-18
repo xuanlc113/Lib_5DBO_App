@@ -98,14 +98,15 @@ def _parse_pb_signals(text):
 	return list(results.values())
 
 def parse_trade_signals(text):
-	bo_text = _extract_section(text, r'ls\s+v3\s+breakout')
-	pb_text = _extract_section(text, r'ls\s+pullbacks')
-	return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
+	# bo_text = _extract_section(text, r'ls\s+v3\s+breakout')
+	# pb_text = _extract_section(text, r'ls\s+pullbacks')
+	# return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
+	return _parse_bo_signals(text) + _parse_pb_signals(text)
 
 def order_and_cap_signals(signals):
-	pb_weekly = [s for s in signals if s["type"] == "PB_weekly"][:2]
+	pb_weekly = [s for s in signals if s["type"] == "PB_weekly"][:5]
 	bo = [s for s in signals if s["type"] == "BO"][:5]
-	pb_daily = [s for s in signals if s["type"] == "PB_daily"][:2]
+	pb_daily = [s for s in signals if s["type"] == "PB_daily"][:5]
 	return pb_weekly + bo + pb_daily
 
 def unlockScreen():
@@ -134,6 +135,7 @@ def startLiberty(stop_event=None):
 		
 		url = cfg.get("url")
 		text = getDiscordChatEOD(url)
+		utils.log("Extracted text to pocess:")
 		utils.log(text)
 		if text == "":
 			utils.log("No text retrieved from Discord, exiting...")
@@ -167,11 +169,13 @@ def startLiberty(stop_event=None):
 # ls v3 breakoUts
 # 1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT
 
+# $ESD - Daily
 # ls pullbacks
 
 # $SD - Daily
 # $DEE - Weekly
 # """
 # orders = parse_trade_signals(text)
+# orders = order_and_cap_signals(orders)
 # print(orders)
 

@@ -63,7 +63,7 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
         reqId = self._nextRequestID()
         contract = self._createContract(ticker)
         bar_size = _INTERVAL_TO_BAR_SIZE[interval]
-        fetch_period = period + 2 + (math.ceil(period/5) * 2)  if period > 1 else period
+        fetch_period = period + (math.ceil(period/5) * 2) + 5 if period > 1 else period
         duration = f"{fetch_period} {interval}"
         super().reqHistoricalData(reqId, contract, "", duration, bar_size, "TRADES", 1, 1, False, [])
         start = time.time()
@@ -184,7 +184,8 @@ class IBAPIApp(IBAPIWrapper, IBAPIClient):
         self._placeStopLimitOrder(new_id, contract, side, quantity, stop_price, limit_price)
 
     def fetchATR(self, ticker: str, period: int = 5, interval: str = "D") -> Optional[float]:
-        bars = self.fetchHistoricalBars(ticker, period + 1, interval) # fetch 1 addition bar for atr gap
+        fetch_period = period * 5 # fetch 5x bars for rma calculation
+        bars = self.fetchHistoricalBars(ticker, fetch_period + 1, interval) # fetch additional bars for atr gap
         if not bars:
             return None
         return order_utils.calc_atr(bars, period)

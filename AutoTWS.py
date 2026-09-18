@@ -266,7 +266,7 @@ def start(orders):
 #         "action": "LONG",
 #         "price": 270,
 #     },
-#     # {"ticker": "QQQ", "type": "PB_weekly"},
+#     {"ticker": "QQQ", "type": "PB_weekly"},
 #     {"ticker": "SPY", "type": "PB_daily"}
 # ])
 
