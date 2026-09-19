@@ -54,6 +54,7 @@ def handleSignalDetails(app, orders) -> list[BOSignal | PBSignal] | None:
     for order in orders:
         ticker = order["ticker"]
         signal_type_str = order["type"]
+        risk = order["risk"]
 
         bars = app.fetchHistoricalBars(ticker, 1, "D", timeout=10)
         bar = bars[-1] if bars else None
@@ -70,6 +71,7 @@ def handleSignalDetails(app, orders) -> list[BOSignal | PBSignal] | None:
                 action=action,
                 price=order["price"],
                 stop=stop,
+                risk=risk
             ))
         elif signal_type_str in ("PB_daily", "PB_weekly"):
             signal_type = SignalType.PB_DAILY if signal_type_str == "PB_daily" else SignalType.PB_WEEKLY
@@ -83,6 +85,7 @@ def handleSignalDetails(app, orders) -> list[BOSignal | PBSignal] | None:
                 bar=bar,
                 atr=atr,
                 signal_type=signal_type,
+                risk=risk
             ))
 
     return signals
@@ -216,9 +219,9 @@ def start(orders):
 
     for signal in signals:
         if isinstance(signal, BOSignal):
-            handleBOSignal(app, signal, betSize, limitBuffer)
+            handleBOSignal(app, signal, betSize * signal.risk, limitBuffer)
         elif isinstance(signal, PBSignal):
-            handlePBSignal(app, signal, betSize, limitBuffer)
+            handlePBSignal(app, signal, betSize * signal.risk, limitBuffer)
 
     time.sleep(10)
 
@@ -232,9 +235,9 @@ def start(orders):
                 if not app.cancelOrderForTicker(signal.ticker):
                     continue
             if isinstance(signal, BOSignal):
-                handleBOSignal(app, signal, betSize, limitBuffer)
+                handleBOSignal(app, signal, betSize * signal.risk, limitBuffer)
             elif isinstance(signal, PBSignal):
-                handlePBSignal(app, signal, betSize, limitBuffer)
+                handlePBSignal(app, signal, betSize * signal.risk, limitBuffer)
         time.sleep(10)
         retrySignals = getRetrySignals(app, signals)
 

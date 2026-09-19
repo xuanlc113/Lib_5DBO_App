@@ -37,6 +37,7 @@ class BOSignal:
     action: str
     price: float
     stop: float
+    risk: float
 
 
 @dataclass
@@ -45,3 +46,4 @@ class PBSignal:
     bar: Bar
     atr: float
     signal_type: SignalType
+    risk: float

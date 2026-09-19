@@ -78,6 +78,7 @@ def _parse_bo_signals(text):
 				"type": "BO",
 				"action": direction_match.group(1).upper(),
 				"price": float(price_match.group(1)),
+				"risk": 1,
 			}
 	return list(results.values())
 
@@ -91,10 +92,12 @@ def _parse_pb_signals(text):
 		if not tm:
 			continue
 		ticker = tm.group(1).upper()
-		if re.search(r'\bweekly\b', line, re.IGNORECASE):
-			results[ticker] = {"ticker": ticker, "type": "PB_weekly"}
+		if re.search(r'\bnas[^\r\n]*\bweekly\b', line, re.IGNORECASE):
+			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.25}
+		elif re.search(r'\betf[^\r\n]*\bweekly\b', line, re.IGNORECASE):
+			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.75}
 		elif re.search(r'\bdaily\b', line, re.IGNORECASE):
-			results[ticker] = {"ticker": ticker, "type": "PB_daily"}
+			results[ticker] = {"ticker": ticker, "type": "PB_daily", "risk": 0.375}
 	return list(results.values())
 
 def parse_trade_signals(text):
@@ -168,12 +171,22 @@ def startLiberty(stop_event=None):
 # text= """
 # ls v3 breakoUts
 # 1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT
+# 1) $AAA (Blackstone Mortgage Trust)
+
+# - If closing below $13.53 SHORT
 
 # $ESD - Daily
 # ls pullbacks
 
 # $SD - Daily
-# $DEE - Weekly
+# $DEE - nas Weekly
+# 1) $IWM - ETF Weekly 
+
+# 2) $DIA - NAS  adwa Weekly 
+
+# 3) $MDY - NASDAQ Weekly 
+
+# 4) $XLF - ETFfwe2f Weekly
 # """
 # orders = parse_trade_signals(text)
 # orders = order_and_cap_signals(orders)
