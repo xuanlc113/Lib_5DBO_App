@@ -214,7 +214,7 @@ def start(orders):
 
     utils.log(signals)
 
-    utils.wait_until_ny(57, second=45)
+    utils.wait_until_ny(58, second=0)
     utils.log("placing orders...")
 
     for signal in signals:

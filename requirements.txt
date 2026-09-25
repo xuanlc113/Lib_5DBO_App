@@ -1,0 +1,7 @@
+ibapi
+python-dotenv
+pyautogui
+pycaw
+pyperclip
+pywin32
+pytz
