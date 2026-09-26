@@ -92,10 +92,10 @@ def _parse_pb_signals(text):
 		if not tm:
 			continue
 		ticker = tm.group(1).upper()
-		if re.search(r'\bnas[^\r\n]*\bweekly\b', line, re.IGNORECASE):
-			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.25}
-		elif re.search(r'\betf[^\r\n]*\bweekly\b', line, re.IGNORECASE):
+		if re.search(r'\betf[^\r\n]*\bweekly\b', line, re.IGNORECASE):
 			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.75}
+		elif re.search(r'\bweekly\b', line, re.IGNORECASE):
+			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.25}
 		elif re.search(r'\bdaily\b', line, re.IGNORECASE):
 			results[ticker] = {"ticker": ticker, "type": "PB_daily", "risk": 0.375}
 	return list(results.values())
@@ -187,8 +187,9 @@ def startLiberty(stop_event=None):
 # 3) $MDY - NASDAQ Weekly 
 
 # 4) $XLF - ETFfwe2f Weekly
+# 5) $XLE - Weekly
 # """
 # orders = parse_trade_signals(text)
-# orders = order_and_cap_signals(orders)
+# # orders = order_and_cap_signals(orders)
 # print(orders)
 
