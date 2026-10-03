@@ -92,9 +92,9 @@ def _parse_pb_signals(text):
 		if not tm:
 			continue
 		ticker = tm.group(1).upper()
-		if re.search(r'\betf[^\r\n]*\bweekly\b', line, re.IGNORECASE):
+		if re.search(r'\betf.*\bweekly\b', line, re.IGNORECASE):
 			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.75}
-		elif re.search(r'\bweekly\b', line, re.IGNORECASE):
+		elif re.search(r'\bnas.*\bweekly\b', line, re.IGNORECASE):
 			results[ticker] = {"ticker": ticker, "type": "PB_weekly", "risk": 0.25}
 		elif re.search(r'\bdaily\b', line, re.IGNORECASE):
 			results[ticker] = {"ticker": ticker, "type": "PB_daily", "risk": 0.375}
@@ -169,25 +169,14 @@ def startLiberty(stop_event=None):
 # text = getDiscordChatEOD(url)
 # print(text)
 # text= """
-# ls v3 breakoUts
-# 1) $BXMT (Blackstone Mortgage Trust) - If closing below $13.53 SHORT
-# 1) $AAA (Blackstone Mortgage Trust)
+# LSv3 Breakouts:
+# $CPAY (Corpay, Inc.) - If closing above $14.32 LONG
+# $META (META Inc) - If closing below $102.52 SHORT
 
-# - If closing below $13.53 SHORT
-
-# $ESD - Daily
-# ls pullbacks
-
-# $SD - Daily
-# $DEE - nas Weekly
-# 1) $IWM - ETF Weekly 
-
-# 2) $DIA - NAS  adwa Weekly 
-
-# 3) $MDY - NASDAQ Weekly 
-
-# 4) $XLF - ETFfwe2f Weekly
-# 5) $XLE - Weekly
+# LS Pullbacks:
+# $IWM - ETF Weekly
+# $IBB - ETF Daily
+# $ADP - NAS100 Weekly
 # """
 # orders = parse_trade_signals(text)
 # # orders = order_and_cap_signals(orders)

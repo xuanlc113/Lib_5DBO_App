@@ -212,7 +212,9 @@ def start(orders):
         utils.alarm()
         return
 
-    utils.log(signals)
+    for signal in signals:
+        utils.log(signal)
+        utils.log(" ")
 
     utils.wait_until_ny(57, second=45)
     utils.log("placing orders...")
