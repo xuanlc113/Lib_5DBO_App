@@ -243,6 +243,7 @@ def start(orders):
         time.sleep(10)
         retrySignals = getRetrySignals(app, signals)
 
+    utils.wait_until_ny(59, second=35) # cancel orders only after 15:59:35
     utils.log("Cancelling remaining active orders...")
     unfilledTickers = []
     for signal in signals:
