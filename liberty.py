@@ -101,10 +101,11 @@ def _parse_pb_signals(text):
 	return list(results.values())
 
 def parse_trade_signals(text):
-	# bo_text = _extract_section(text, r'ls\s+v3\s+breakout')
-	# pb_text = _extract_section(text, r'ls\s+pullbacks')
-	# return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
-	return _parse_bo_signals(text) + _parse_pb_signals(text)
+	parts = text.split(f'signals')
+	signal_text = parts[-1]
+	bo_text = _extract_section(signal_text, r'ls\s+v3\s+breakout')
+	pb_text = _extract_section(signal_text, r'ls\s+pullbacks')
+	return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
 
 def order_and_cap_signals(signals):
 	pb_weekly = [s for s in signals if s["type"] == "PB_weekly"][:5]
@@ -169,16 +170,48 @@ def startLiberty(stop_event=None):
 # text = getDiscordChatEOD(url)
 # print(text)
 # text= """
-# LSv3 Breakouts:
+# Trades Closing Today 🔔  :  $ADP (LS Pullback Nas 100 Weekly)
+# TODAY'S SiGNALS:
+# LS v3 Breakouts:
 # $CPAY (Corpay, Inc.) - If closing above $14.32 LONG
 # $META (META Inc) - If closing below $102.52 SHORT
 
 # LS Pullbacks:
 # $IWM - ETF Weekly
 # $IBB - ETF Daily
-# $ADP - NAS100 Weekly
+# $ABC - NAS100 Weekly
+# """
+# text = """
+# Trades Closing Today   :  $ADP (LS Pullback Nas 100 Weekly)
+
+
+# TODAYS SIGNALS:
+
+
+# LS v3 Breakouts
+
+
+
+# 1) $IVZ (Invesco Ltd) - If closing below $27.65 SHORT
+
+
+
+
+# LS Pullbacks
+
+
+
+# 1) $LITE - NAS100 Weekly
+
+
+
+# 2) $SMH - ETF Weekly 
+
+
+
+
+
 # """
 # orders = parse_trade_signals(text)
-# # orders = order_and_cap_signals(orders)
+# orders = order_and_cap_signals(orders)
 # print(orders)
-
