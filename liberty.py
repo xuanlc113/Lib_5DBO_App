@@ -49,6 +49,7 @@ def getDiscordChatEOD(url):
 
 	return parts[-1]
 
+# this does not work
 def _extract_section(text, header_pattern):
 	match = re.search(header_pattern, text, re.IGNORECASE)
 	if not match:
@@ -100,12 +101,32 @@ def _parse_pb_signals(text):
 			results[ticker] = {"ticker": ticker, "type": "PB_daily", "risk": 0.375}
 	return list(results.values())
 
+def _has_abort_signal(text):
+	return re.search(r'\bABORT\s+\$?[A-Z]+\b', text, re.IGNORECASE) is not None
+
+def _remove_aborted_signals(signals, text):
+	aborted_tickers = {
+		match.group(1).upper()
+		for match in re.finditer(r'\bABORT\s+\$?([A-Z]+)\b', text, re.IGNORECASE)
+	}
+	
+	utils.log(f'Abort signals: {aborted_tickers}')
+	return [signal for signal in signals if signal["ticker"].upper() not in aborted_tickers]
+
 def parse_trade_signals(text):
-	parts = text.split(f'signals')
+	parts = text.split(f'TODAYS SIGNALS')
 	signal_text = parts[-1]
-	bo_text = _extract_section(signal_text, r'ls\s+v3\s+breakout')
-	pb_text = _extract_section(signal_text, r'ls\s+pullbacks')
-	return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
+	utils.log(f'Signal Text: \n {signal_text}')
+	# bo_text = _extract_section(signal_text, r'ls\s+v3\s+breakout')
+	# pb_text = _extract_section(signal_text, r'ls\s+pullbacks')
+	# return _parse_bo_signals(bo_text) + _parse_pb_signals(pb_text)
+	# return _parse_bo_signals(text) + _parse_pb_signals(text)
+	signals = _parse_bo_signals(signal_text) + _parse_pb_signals(signal_text)
+	utils.log(f'Initial signals: {signals}')
+	if _has_abort_signal(signal_text):
+		signals = _remove_aborted_signals(signals, signal_text)
+	utils.log(f'Final signals: {signals}')
+	return signals
 
 def order_and_cap_signals(signals):
 	pb_weekly = [s for s in signals if s["type"] == "PB_weekly"][:5]
